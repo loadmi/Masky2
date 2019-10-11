@@ -1,3 +1,5 @@
-import { Master} from './bot'
+import { Master } from './bot'
 
-Master.start()
+
+const masterInstance = new Master()
+masterInstance.start()

@@ -36,52 +36,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-var globalDefinitions_1 = require("./globalDefinitions");
-var Websocket = require("websocket");
+var masky_1 = require("./masky");
+var dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
+var userArr = [];
 var Master = /** @class */ (function () {
     function Master() {
     }
-    Master.start = function () {
-        var _this = this;
-        var websocketClient = Websocket.client;
-        var client = new websocketClient();
-        client.connect(globalDefinitions_1.webSocketEndpoint, "graphql-ws");
-        client.on('connect', function (data) { return __awaiter(_this, void 0, void 0, function () {
-            var res;
+    Master.prototype.loadUsers = function () {
+        dataStore.get('users').forEach(function (user) {
+            userArr.push(new masky_1.Masky({ blockchainUsername: user }));
+        });
+    };
+    Master.prototype.connectUsers = function () {
+        userArr.forEach(function (masky) {
+            masky.connect();
+        });
+    };
+    Master.prototype.start = function () {
+        return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0:
-                        data.sendUTF(JSON.stringify({
-                            type: "connection_init",
-                            payload: {}
-                        }));
-                        return [4 /*yield*/, data.sendUTF(JSON.stringify({
-                                id: "1",
-                                type: "start",
-                                payload: {
-                                    variables: {
-                                        streamer: 'dlive-bwxglwsybg'
-                                    },
-                                    extensions: {},
-                                    operationName: "StreamMessageSubscription",
-                                    query: "subscription StreamMessageSubscription($streamer: String!) {\n  streamMessageReceived(streamer: $streamer) {\n    type\n    ... on ChatGift {\n      id\n      gift\n      amount\n      recentCount\n      expireDuration\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatHost {\n      id\n      viewer\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatSubscription {\n      id\n      month\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatChangeMode {\n      mode\n    }\n    ... on ChatText {\n      id\n      content\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatFollow {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatDelete {\n      ids\n    }\n    ... on ChatBan {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatModerator {\n      id\n      ...VStreamChatSenderInfoFrag\n      add\n    }\n    ... on ChatEmoteAdd {\n      id\n      ...VStreamChatSenderInfoFrag\n      emote\n    }\n  }\n}\n\nfragment VStreamChatSenderInfoFrag on SenderInfo {\n  subscribing\n  role\n  roomRole\n  sender {\n    id\n    username\n    displayname\n    avatar\n    partnerStatus\n  }\n}\n"
-                                }
-                            }))];
+                    case 0: return [4 /*yield*/, this.loadUsers()];
                     case 1:
-                        res = _a.sent();
-                        data.on('message', function (message) {
-                            if (message && message.type === "utf8") {
-                                message = JSON.parse(message.utf8Data);
-                                if (message.payload !== undefined) {
-                                    var remMessage = message.payload.data.streamMessageReceived["0"];
-                                    console.log(remMessage);
-                                }
-                            }
-                        });
+                        _a.sent();
+                        console.log('Loaded users');
+                        this.connectUsers();
+                        console.log('Connected users');
                         return [2 /*return*/];
                 }
             });
-        }); });
+        });
     };
     return Master;
 }());

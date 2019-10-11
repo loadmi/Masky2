@@ -1,4 +1,5 @@
 export type streamer = {
-    apiKey: string,
-
+    blockchainUsername: string,
+    displayname?: string
 }
+
