@@ -108,8 +108,9 @@ export class Masky extends EventEmitter  {
     public chatReceived(chatText: any){
         if(chatText.sender.displayname !== 'Masky_bot'){
             this.deleteChat(chatText.id)
+            this.sendChat('silence mode is enabled! Psst!')
         }
-        this.sendChat('silence mode is enabled! Psst!')
+
         //console.log(chatText)
     }
 
