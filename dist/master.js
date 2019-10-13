@@ -1,10 +1,9 @@
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -37,34 +36,57 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var masky_1 = require("./masky");
+var globalDefinitions_1 = require("./globalDefinitions");
+var apollo_fetch_1 = require("apollo-fetch");
+var graphql_json_1 = require("./graphql.json");
 var dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
 var userArr = [];
 var Master = /** @class */ (function () {
     function Master() {
     }
     Master.prototype.loadUsers = function () {
-        dataStore.get('users').forEach(function (user) {
-            userArr.push(new masky_1.Masky({ blockchainUsername: user }));
-        });
+        var _this = this;
+        dataStore.get('users').forEach(function (user) { return __awaiter(_this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.fetchQuery(graphql_json_1.MeGlobal).then(function (me) {
+                    userArr.push(new masky_1.Masky({ blockchainUsername: user, displayname: me.data.me.displayname }));
+                    console.log('loaded users');
+                    _this.connectUsers();
+                });
+                return [2 /*return*/];
+            });
+        }); });
     };
     Master.prototype.connectUsers = function () {
         userArr.forEach(function (masky) {
             masky.connect();
         });
+        console.log('connected users');
     };
     Master.prototype.start = function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.loadUsers()];
-                    case 1:
-                        _a.sent();
-                        console.log('Loaded users');
-                        this.connectUsers();
-                        console.log('Connected users');
-                        return [2 /*return*/];
-                }
+                this.loadUsers();
+                return [2 /*return*/];
             });
+        });
+    };
+    Master.prototype.fetchQuery = function (query, variables) {
+        var fetch = apollo_fetch_1.createApolloFetch({
+            uri: globalDefinitions_1.apiEndpoint,
+        });
+        fetch.use(function (_a, next) {
+            var request = _a.request, options = _a.options;
+            if (!options.headers) {
+                options.headers = {};
+            }
+            options.headers['authorization'] = globalDefinitions_1.apiKey;
+            next();
+        });
+        return fetch({
+            query: query,
+            variables: variables,
         });
     };
     return Master;

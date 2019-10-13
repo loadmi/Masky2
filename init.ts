@@ -1,4 +1,4 @@
-import { Master } from './bot'
+import { Master } from './master'
 
 
 const masterInstance = new Master()
