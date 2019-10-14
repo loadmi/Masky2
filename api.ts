@@ -1,10 +1,10 @@
 import {EventEmitter} from "events";
 import {streamer} from "./types";
 import {webSocketEndpoint} from "./globalDefinitions";
-import * as Websocket from 'websocket'
+import { client } from 'websocket'
 
 
-const client = new Websocket.client();
+const socket = new client;
 
 export class API extends EventEmitter {
 
@@ -19,11 +19,15 @@ export class API extends EventEmitter {
     }
 
     public connect(){
-    client.connect(webSocketEndpoint, "graphql-ws");
+        socket.connect(webSocketEndpoint, "graphql-ws");
+    }
+
+    public destroy(){
+    socket.removeAllListeners()
     }
 
     public subscribe(){
-        client.on('connect', async (data) =>{
+        socket.on('connect', async (data) =>{
             data.sendUTF(
                 JSON.stringify({
                     type: "connection_init",
@@ -48,7 +52,7 @@ export class API extends EventEmitter {
             data.on('message', (message)=>{
                 if (message && message.type === "utf8") {
                     message = JSON.parse(message.utf8Data);
-                    if (message.payload !== undefined) {
+                    if (message.payload !== undefined && message.payload.data) {
                         const remMessage = message.payload.data.streamMessageReceived["0"];
                         this.emit(remMessage.__typename, remMessage)
                     }

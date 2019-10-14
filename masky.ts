@@ -3,7 +3,7 @@ import {EventEmitter} from "events";
 import { API } from './api'
 import { apiEndpoint, apiKey } from './globalDefinitions'
 
-
+let api: API = null
 const { createApolloFetch } = require('apollo-fetch');
 import {
     SendStreamChatMessage,
@@ -64,7 +64,7 @@ export class Masky extends EventEmitter  {
         })
     }
 
-    public startListeners(api: API) {
+    public startListeners() {
         api.on('ChatText', (chatText) =>{
             this.chatReceived(chatText)
         })
@@ -98,11 +98,18 @@ export class Masky extends EventEmitter  {
 
     }
 
-    public connect() {
 
-        const api = new API(this.streamer)
+    public destroy(){
+        api.removeAllListeners()
+        api.destroy()
+        console.log('Instance ' + this.streamer.blockchainUsername + ' has died')
+    }
+
+
+    public connect() {
+        api  = new API(this.streamer)
         api.init()
-        this.startListeners(api)
+        this.startListeners()
     }
 
     public chatReceived(chatText: any){

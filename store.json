@@ -1,6 +1,11 @@
 {
   "data": {},
   "users": [
-    "dlive-bwxglwsybg"
+    {
+      "blockchainName": "dlive-bwxglwsybg",
+      "config": {
+        "userKey": "dKP0cl8TI4kThyM3Xt6z"
+      }
+    }
   ]
 }
