@@ -2,15 +2,32 @@ import {Masky} from './masky'
 import {apiEndpoint, apiKey} from "./globalDefinitions";
 import {createApolloFetch} from "apollo-fetch";
 import {DisplaynameToUser, GetUserInfo, MeGlobal} from './graphql.json'
+import {webSocketEndpoint} from "./globalDefinitions";
+import { client } from 'websocket'
 
+const socket = new client;
 const express = require('express');
 const dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
 let userArr: Array<Masky> = []
-
+let connection = null
 
 export class Master{
 
+    public async connectAPI() {
+        await socket.connect(webSocketEndpoint, "graphql-ws");
+       socket.on('connect', async (data) =>{
 
+            data.sendUTF(
+                JSON.stringify({
+                    type: "connection_init",
+                    payload: {}
+                })
+            );
+            connection = data
+           this.loadUsers()
+        })
+
+    }
 
     public loadUsers() {
             dataStore.get('users').forEach(async (user) => {
@@ -20,7 +37,7 @@ export class Master{
                 const masky = new Masky({
                     blockchainUsername: user.blockchainName,
                     displayname: me.data.user.displayname
-                })
+                }, connection)
                 userArr.push(masky)
                 // TODO: Initial connect doesn't work
                 masky.connect()
@@ -32,7 +49,7 @@ export class Master{
 
    public async start() {
 
-       this.loadUsers()
+        this.connectAPI()
        this.startServer()
    }
     public getConfig(blockchainName: string){
@@ -46,7 +63,7 @@ export class Master{
         }else{
         if(!this.getConfig(blockchainName)){
             dataStore.union('users', {blockchainName: blockchainName, config: {userKey: userKey}});
-            const masky = new Masky({blockchainUsername: blockchainName, displayname: username})
+            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection)
             userArr.push(masky)
             masky.connect()
             return `
@@ -66,7 +83,7 @@ export class Master{
             if(this.isRunning(username)){
                 return 'Bot is already running on user ' + username
             } else {
-                const masky = new Masky({blockchainUsername: blockchainName, displayname: username})
+                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection)
                 userArr.push(masky)
                 masky.connect()
                 return 'Bot has been started on user ' + username

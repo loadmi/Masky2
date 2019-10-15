@@ -36,10 +36,11 @@ import {
     TopContributors,
     UnfollowUser
 } from './graphql.json'
+import {connection} from "websocket";
 
 export class Masky extends EventEmitter  {
 
-    constructor( public streamer: streamer) {
+    constructor( public streamer: streamer, public connection) {
         super()
     }
 
@@ -107,7 +108,7 @@ export class Masky extends EventEmitter  {
 
 
     public connect() {
-        api  = new API(this.streamer)
+        api  = new API(this.streamer, this.connection)
         api.init()
         this.startListeners()
     }
