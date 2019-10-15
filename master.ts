@@ -12,24 +12,22 @@ export class Master{
 
 
 
-    public loadUsers(){
-        dataStore.get('users').forEach(async (user) => {
-           this.fetchQuery(GetUserInfo, {
-               username: user.blockchainName
-           }).then((me)=> {
-               userArr.push(new Masky({blockchainUsername: user.blockchainName, displayname: me.data.user.displayname}))
-               console.log('loaded users')
-               this.connectUsers()
-           })
+    public loadUsers() {
+            dataStore.get('users').forEach(async (user) => {
+            this.fetchQuery(GetUserInfo, {
+                username: user.blockchainName
+            }).then((me) => {
+                const masky = new Masky({
+                    blockchainUsername: user.blockchainName,
+                    displayname: me.data.user.displayname
+                })
+                userArr.push(masky)
+                // TODO: Initial connect doesn't work
+                masky.connect()
+            })
         })
-    }
+        console.log('loaded users')
 
-    public connectUsers(){
-        userArr.forEach((masky) => {
-            masky.connect()
-
-        })
-        console.log('connected users')
     }
 
    public async start() {
@@ -43,6 +41,9 @@ export class Master{
     public async registerBot(username: string) {
         const userKey = this.generateKey(20)
         const blockchainName = await this.displayNameToUser(username)
+        if (!blockchainName){
+            return 'This dlive user does not exist!'
+        }else{
         if(!this.getConfig(blockchainName)){
             dataStore.union('users', {blockchainName: blockchainName, config: {userKey: userKey}});
             const masky = new Masky({blockchainUsername: blockchainName, displayname: username})
@@ -55,7 +56,7 @@ export class Master{
         `
         } else {
            return 'User ' + username + ' is already registered!'
-        }
+        }}
 
     }
     public async startBot(username: string, key: string) {
@@ -165,11 +166,13 @@ export class Master{
         return this.fetchQuery(DisplaynameToUser, {
             displayname: displayName
         }).then((res) => {
-            if (res.errors) {
+            if (!res.data.userByDisplayName) {
                 console.log('Could not convert display name to user. Error: ')
-                console.log(res.errors)
+                console.log(res.data)
+            } else {
+                return res.data.userByDisplayName.username
             }
-            return res.data.userByDisplayName.username
+
         })
     }
 

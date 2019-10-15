@@ -28,12 +28,14 @@ export class API extends EventEmitter {
 
     public subscribe(){
         socket.on('connect', async (data) =>{
-            data.sendUTF(
-                JSON.stringify({
-                    type: "connection_init",
-                    payload: {}
-                })
-            );
+
+               data.sendUTF(
+                   JSON.stringify({
+                       type: "connection_init",
+                       payload: {}
+                   })
+               );
+
             console.log(this.streamer.blockchainUsername + ' Connected successfully')
             const res =  await data.sendUTF(JSON.stringify({
                 id: "1",
@@ -50,6 +52,7 @@ export class API extends EventEmitter {
             }))
 
             data.on('message', (message)=>{
+                console.log(message)
                 if (message && message.type === "utf8") {
                     message = JSON.parse(message.utf8Data);
                     if (message.payload !== undefined && message.payload.data) {

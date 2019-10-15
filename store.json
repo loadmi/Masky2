@@ -4,7 +4,13 @@
     {
       "blockchainName": "dlive-bwxglwsybg",
       "config": {
-        "userKey": "dKP0cl8TI4kThyM3Xt6z"
+        "userKey": "akzU3iEzLdUdsjqoRsuZ"
+      }
+    },
+    {
+      "blockchainName": "dlive-81116360",
+      "config": {
+        "userKey": "SZFnTw2tcaWwvzJ4lUlZ"
       }
     }
   ]
