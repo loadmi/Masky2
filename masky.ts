@@ -40,7 +40,7 @@ import {connection} from "websocket";
 
 export class Masky extends EventEmitter  {
 
-    constructor( public streamer: streamer, public connection) {
+    constructor( public streamer: streamer, public connection, public subscriptionId: string) {
         super()
     }
 
@@ -100,15 +100,10 @@ export class Masky extends EventEmitter  {
     }
 
 
-    public destroy(){
-        api.removeAllListeners()
-        api.destroy()
-        console.log('Instance ' + this.streamer.blockchainUsername + ' has died')
-    }
 
 
     public connect() {
-        api  = new API(this.streamer, this.connection)
+        api  = new API(this.streamer, this.connection, this.subscriptionId)
         api.init()
         this.startListeners()
     }

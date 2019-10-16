@@ -23,6 +23,7 @@ export class Master{
                     payload: {}
                 })
             );
+            console.log('master API connection established ')
             connection = data
            this.loadUsers()
         })
@@ -34,10 +35,11 @@ export class Master{
             this.fetchQuery(GetUserInfo, {
                 username: user.blockchainName
             }).then((me) => {
+                const subId = this.getConfig(user.blockchainName).config.subscriptionId
                 const masky = new Masky({
                     blockchainUsername: user.blockchainName,
                     displayname: me.data.user.displayname
-                }, connection)
+                }, connection, subId)
                 userArr.push(masky)
                 // TODO: Initial connect doesn't work
                 masky.connect()
@@ -57,13 +59,14 @@ export class Master{
     }
     public async registerBot(username: string) {
         const userKey = this.generateKey(20)
+        const subId = this.generateId(10)
         const blockchainName = await this.displayNameToUser(username)
         if (!blockchainName){
             return 'This dlive user does not exist!'
         }else{
         if(!this.getConfig(blockchainName)){
-            dataStore.union('users', {blockchainName: blockchainName, config: {userKey: userKey}});
-            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection)
+            dataStore.union('users', {blockchainName: blockchainName, config: {userKey: userKey, subscriptionId: subId}});
+            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection,subId )
             userArr.push(masky)
             masky.connect()
             return `
@@ -78,12 +81,13 @@ export class Master{
     }
     public async startBot(username: string, key: string) {
         const blockchainName = await this.displayNameToUser(username)
+        const subId = this.getConfig(blockchainName).config.subscriptionId
         const userKey = this.getConfig(blockchainName).config.userKey
         if(key === userKey){
             if(this.isRunning(username)){
                 return 'Bot is already running on user ' + username
             } else {
-                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection)
+                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection, subId)
                 userArr.push(masky)
                 masky.connect()
                 return 'Bot has been started on user ' + username
@@ -100,7 +104,8 @@ export class Master{
         if (key === userKey) {
             if(this.isRunning(username)){
                 const masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
-                masky.destroy();
+                await this.killSubscription(masky.subscriptionId)
+                console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
                 userArr = this.arrayRemove(userArr, masky)
                 return 'Bot has been stopped on user ' + username
             } else {
@@ -110,6 +115,13 @@ export class Master{
         } else {
             return 'This API key is not valid for user ' + username
         }
+    }
+
+    public killSubscription(id: string){
+        connection.sendUTF(JSON.stringify({
+            id: id,
+            type: "stop",
+        }))
     }
 
     public arrayRemove(arr: Array<Masky>, value: Masky) {
@@ -168,6 +180,16 @@ export class Master{
     public generateKey(length) {
         let result = '';
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const charactersLength = characters.length;
+        for (let i = 0; i < length; i++ ) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
+    }
+
+    public generateId(length) {
+        let result = '';
+        const characters = '123456789';
         const charactersLength = characters.length;
         for (let i = 0; i < length; i++ ) {
             result += characters.charAt(Math.floor(Math.random() * charactersLength));

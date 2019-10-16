@@ -3,12 +3,11 @@ import {streamer} from "./types";
 import {webSocketEndpoint} from "./globalDefinitions";
 import {client} from 'websocket'
 
-
 const socket = new client;
 
 export class API extends EventEmitter {
 
-    constructor(public streamer: streamer, public connection) {
+    constructor(public streamer: streamer, public connection, public subscriptionId: string) {
         super()
     }
 
@@ -17,13 +16,9 @@ export class API extends EventEmitter {
         this.subscribe()
     }
 
-    public destroy(){
-    socket.removeAllListeners()
-    }
-
     public subscribe(){
         this.connection.sendUTF(JSON.stringify({
-            id: "1",
+            id: this.subscriptionId,
             type: "start",
             payload: {
                 variables: {
