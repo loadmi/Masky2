@@ -1,13 +1,10 @@
 import {EventEmitter} from "events";
 import {streamer} from "./types";
-import {webSocketEndpoint} from "./globalDefinitions";
-import {client} from 'websocket'
-
-const socket = new client;
+import {connection} from "websocket";
 
 export class API extends EventEmitter {
 
-    constructor(public streamer: streamer, public connection, public subscriptionId: string) {
+    constructor(public streamer: streamer, public con:connection) {
         super()
     }
 
@@ -17,8 +14,8 @@ export class API extends EventEmitter {
     }
 
     public subscribe(){
-        this.connection.sendUTF(JSON.stringify({
-            id: this.subscriptionId,
+        this.con.sendUTF(JSON.stringify({
+            id: this.streamer.blockchainUsername,
             type: "start",
             payload: {
                 variables: {
@@ -31,7 +28,7 @@ export class API extends EventEmitter {
             }
         }))
         console.log('connected user ' + this.streamer.blockchainUsername)
-    this.connection.on('message', (message)=>{
+    this.con.on('message', (message)=>{
             if (message && message.type === "utf8") {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {

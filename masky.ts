@@ -1,9 +1,10 @@
 import {streamer} from "./types";
 import {EventEmitter} from "events";
 import { API } from './api'
-import { apiEndpoint, apiKey } from './globalDefinitions'
-
+import {apiEndpoint, apiKey, commandsList} from './globalDefinitions'
+import unirest from 'unirest';
 let api: API = null
+
 const { createApolloFetch } = require('apollo-fetch');
 import {
     SendStreamChatMessage,
@@ -37,10 +38,11 @@ import {
     UnfollowUser
 } from './graphql.json'
 import {connection} from "websocket";
+import * as https from "https";
 
 export class Masky extends EventEmitter  {
 
-    constructor( public streamer: streamer, public connection, public subscriptionId: string) {
+    constructor( public streamer: streamer, public con: connection) {
         super()
     }
 
@@ -103,18 +105,97 @@ export class Masky extends EventEmitter  {
 
 
     public connect() {
-        api  = new API(this.streamer, this.connection, this.subscriptionId)
+        api  = new API(this.streamer, this.con)
         api.init()
         this.startListeners()
     }
 
-    public chatReceived(chatText: any){
-        if(chatText.sender.displayname !== 'Masky_bot'){
-            this.deleteChat(chatText.id)
-            this.sendChat('silence mode is enabled! Psst!')
-        }
 
-        //console.log(chatText)
+    public async chatReceived(chatText: any) {
+        const message: string = chatText.content
+        const senderBlockchainName: string = chatText.sender.username
+        const senderDisplayName: string = chatText.sender.displayname
+        const id: string = chatText.id
+        const role: string = chatText.role
+
+        switch (true) {
+
+            case message.startsWith('!help'):
+                this.sendChat('Available commands can be found here: ' + commandsList)
+                break;
+            case message.startsWith('!credits'):
+                this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2')
+                break
+            case message.startsWith('!introduce'):
+                this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do')
+                break
+            case message.startsWith('!chuck'):
+                      this.sendChat(await this.getChuck())
+                break
+            case message.startsWith('!advice'):
+                this.sendChat(await this.getAdvice())
+                break
+            case message.startsWith('!decide'):
+                this.sendChat('@'+ senderDisplayName + ' ' + await this.getDecision())
+                break
+            case message.startsWith('!ud'):
+                let word = message.split(/ (.+)/)[1]
+                this.sendChat(await this.getDefinition(word))
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+            case message.startsWith(''):
+                break
+        }
+    }
+
+    public async getChuck() {
+        return unirest.get('https://api.chucknorris.io/jokes/random').then((data) =>{
+            return data.body.value
+        })
+    }
+
+    public async getAdvice() {
+        return unirest.get('https://api.adviceslip.com/advice').then((data) =>{
+            return (JSON.parse(data.body).slip.advice)
+        })
+    }
+
+    public async getDecision() {
+        return unirest.get('https://yesno.wtf/api').then((data) =>{
+            return data.body.answer
+        })
+    }
+
+    public async getDefinition(word: string) {
+        return unirest.get('https://mashape-community-urban-dictionary.p.rapidapi.com/define?term=' + word)
+            .header("X-RapidAPI-Host", "mashape-community-urban-dictionary.p.rapidapi.com")
+            .header("X-RapidAPI-Key", "fzoRArjzeOuwV1ZmlGjE7GG2RcUqiyQm")
+            .then((data) =>{
+                if (data.body.list[0] == null) {
+                    return 'I did not find any definition for ' + word;
+                } else {
+                    let definition = data.body.list[0].definition
+                    if (definition.length > 140) {
+                        let trimmedString = definition.substring(0, 140);
+                        return trimmedString
+                    } else {
+                        return definition;
+                    }
+
+                }
+            return data.body.answer
+        })
     }
 
     public sendChat(message: string){

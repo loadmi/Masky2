@@ -9,9 +9,18 @@ const socket = new client;
 const express = require('express');
 const dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
 let userArr: Array<Masky> = []
-let connection = null
+let con = null
 
 export class Master{
+
+    public newDataStoreUser(blockchainName: string, userKey: string){
+        dataStore.union('users', {
+            blockchainName: blockchainName,
+            config: {
+                userKey: userKey,
+                running: true
+            }});
+    }
 
     public async connectAPI() {
         await socket.connect(webSocketEndpoint, "graphql-ws");
@@ -24,7 +33,7 @@ export class Master{
                 })
             );
             console.log('master API connection established ')
-            connection = data
+           con = data
            this.loadUsers()
         })
 
@@ -32,18 +41,19 @@ export class Master{
 
     public loadUsers() {
             dataStore.get('users').forEach(async (user) => {
-            this.fetchQuery(GetUserInfo, {
-                username: user.blockchainName
-            }).then((me) => {
-                const subId = this.getConfig(user.blockchainName).config.subscriptionId
-                const masky = new Masky({
-                    blockchainUsername: user.blockchainName,
-                    displayname: me.data.user.displayname
-                }, connection, subId)
-                userArr.push(masky)
-                // TODO: Initial connect doesn't work
-                masky.connect()
-            })
+                if(user.config.running){
+                    this.fetchQuery(GetUserInfo, {
+                        username: user.blockchainName
+                    }).then((me) => {
+                        const masky = new Masky({
+                            blockchainUsername: user.blockchainName,
+                            displayname: me.data.user.displayname
+                        }, con)
+                        userArr.push(masky)
+                        // TODO: Initial connect doesn't work
+                        masky.connect()
+                    })
+                }
         })
         console.log('loaded users')
 
@@ -55,18 +65,19 @@ export class Master{
        this.startServer()
    }
     public getConfig(blockchainName: string){
-        return dataStore.get('users').find(x => x.blockchainName == blockchainName)
+        return dataStore.get('users').find(x => x.blockchainName == blockchainName) ?
+            dataStore.get('users').find(x => x.blockchainName == blockchainName).config : false
     }
+
     public async registerBot(username: string) {
         const userKey = this.generateKey(20)
-        const subId = this.generateId(10)
         const blockchainName = await this.displayNameToUser(username)
         if (!blockchainName){
             return 'This dlive user does not exist!'
         }else{
         if(!this.getConfig(blockchainName)){
-            dataStore.union('users', {blockchainName: blockchainName, config: {userKey: userKey, subscriptionId: subId}});
-            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection,subId )
+            this.newDataStoreUser(blockchainName, userKey)
+            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con )
             userArr.push(masky)
             masky.connect()
             return `
@@ -81,15 +92,17 @@ export class Master{
     }
     public async startBot(username: string, key: string) {
         const blockchainName = await this.displayNameToUser(username)
-        const subId = this.getConfig(blockchainName).config.subscriptionId
-        const userKey = this.getConfig(blockchainName).config.userKey
+        const userKey = this.getConfig(blockchainName).userKey
         if(key === userKey){
             if(this.isRunning(username)){
                 return 'Bot is already running on user ' + username
             } else {
-                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, connection, subId)
+                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con)
                 userArr.push(masky)
                 masky.connect()
+                let config = this.getConfig(blockchainName)
+                config.running = true
+                this.setConfig(blockchainName, config)
                 return 'Bot has been started on user ' + username
             }
 
@@ -100,13 +113,16 @@ export class Master{
     }
     public async stopBot(username: string, key: string) {
         const blockchainName = await this.displayNameToUser(username)
-        const userKey = this.getConfig(blockchainName).config.userKey
+        const userKey = this.getConfig(blockchainName).userKey
         if (key === userKey) {
             if(this.isRunning(username)){
                 const masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
-                await this.killSubscription(masky.subscriptionId)
-                console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
+                await this.killSubscription(masky.streamer.blockchainUsername)
                 userArr = this.arrayRemove(userArr, masky)
+                let config = this.getConfig(blockchainName)
+                config.running = false
+                this.setConfig(blockchainName, config)
+                console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
                 return 'Bot has been stopped on user ' + username
             } else {
                 return 'Bot is not running on user ' + username
@@ -117,8 +133,12 @@ export class Master{
         }
     }
 
+    public setConfig(blockchainName: string, config: Object){
+        dataStore.set('users.' + blockchainName, config)
+    }
+
     public killSubscription(id: string){
-        connection.sendUTF(JSON.stringify({
+        con.sendUTF(JSON.stringify({
             id: id,
             type: "stop",
         }))
@@ -187,15 +207,6 @@ export class Master{
         return result;
     }
 
-    public generateId(length) {
-        let result = '';
-        const characters = '123456789';
-        const charactersLength = characters.length;
-        for (let i = 0; i < length; i++ ) {
-            result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        }
-        return result;
-    }
 
     public isBlockchainName(name: string){
 

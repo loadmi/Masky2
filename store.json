@@ -4,15 +4,8 @@
     {
       "blockchainName": "dlive-81116360",
       "config": {
-        "userKey": "v6We89nhdQaNN7IqTDzN",
-        "subscriptionId": "6527916961"
-      }
-    },
-    {
-      "blockchainName": "dlive-bwxglwsybg",
-      "config": {
-        "userKey": "ARfazDpRqfV7ed0naDOd",
-        "subscriptionId": "3"
+        "userKey": "byYyc6Jv5LzwfDer22Bq",
+        "running": true
       }
     }
   ]
