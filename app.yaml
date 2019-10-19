@@ -1,0 +1,7 @@
+runtime: nodejs10
+network:
+  forwarded_ports:
+    - 3000/tcp
+    - 3000/udp
+    - 80/udp
+    - 80/tcp

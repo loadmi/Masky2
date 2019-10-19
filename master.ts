@@ -1,9 +1,8 @@
 import {Masky} from './masky'
-import {apiEndpoint, apiKey} from "./globalDefinitions";
+import {apiEndpoint, apiKey, webSocketEndpoint} from "./globalDefinitions";
 import {createApolloFetch} from "apollo-fetch";
-import {DisplaynameToUser, GetUserInfo, MeGlobal} from './graphql.json'
-import {webSocketEndpoint} from "./globalDefinitions";
-import { client } from 'websocket'
+import {DisplaynameToUser, GetUserInfo} from './graphql.json'
+import {client} from 'websocket'
 
 const socket = new client;
 const express = require('express');
@@ -173,9 +172,9 @@ export class Master{
        app.get('/stop', async (req, res) => {
            res.send(await this.stopBot(req.query.username, req.query.apikey));
        });
-
-       app.listen(3000, () => {
-           console.log('Masky listening on port 3000!');
+       const port = process.env.PORT || 8080;
+       app.listen(port, () => {
+           console.log('Masky listening on port ' + port);
        });
    }
 

@@ -5,8 +5,9 @@
   "main": "bot.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "bot": "node -r ./dist/init.js",
-    "dev": "ts-node-dev --respawn --transpileOnly ./init.ts",
+    "start": "node -r ./dist/index.js",
+    "dev": "ts-node-dev --respawn --transpileOnly index.ts",
+    "gcp-build": "tsc",
     "tsc": "tsc"
   },
   "keywords": [],

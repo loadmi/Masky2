@@ -1,44 +1,24 @@
 import {streamer} from "./types";
 import {EventEmitter} from "events";
-import { API } from './api'
+import {API} from './api'
 import {apiEndpoint, apiKey, commandsList} from './globalDefinitions'
 import unirest from 'unirest';
-let api: API = null
-
-const { createApolloFetch } = require('apollo-fetch');
 import {
-    SendStreamChatMessage,
     BanStreamChatUser,
-    UnbanStreamChatUser,
-    StreamChatBannedUsers,
-    GetUserInfo,
-    DisplaynameToUser,
-    BrowsePageSearchCategory,
     DeleteChat,
-    FollowingPageLivestreams,
-    FollowingPageVideos,
+    DisplaynameToUser,
     FollowUser,
-    GlobalInformation,
-    HomePageLeaderboard,
-    HomePageLivestream,
-    LivestreamPage,
-    LivestreamProfileFollowers,
-    LivestreamProfileReplay,
-    LivestreamProfileVideo,
-    LivestreamProfileWallet,
-    MeBalance,
-    MeDashboard,
-    MeLivestream,
-    MePartnerProgress,
-    MeSubscribing,
-    SearchPage,
-    StreamChatModerators,
-    StreamMessageSubscription,
-    TopContributors,
+    GetUserInfo,
+    SendStreamChatMessage,
+    StreamChatBannedUsers,
+    UnbanStreamChatUser,
     UnfollowUser
 } from './graphql.json'
 import {connection} from "websocket";
-import * as https from "https";
+
+let api: API = null;
+
+const { createApolloFetch } = require('apollo-fetch');
 
 export class Masky extends EventEmitter  {
 
@@ -70,31 +50,31 @@ export class Masky extends EventEmitter  {
     public startListeners() {
         api.on('ChatText', (chatText) =>{
             this.chatReceived(chatText)
-        })
+        });
         api.on('ChatHost', (chatHost) =>{
             this.gotHosted(chatHost)
-        })
+        });
         api.on('ChatGift', (chatGift) => {
             this.giftReceived(chatGift)
-        })
+        });
         api.on('ChatSubscription', (chatSubscription) => {
             this.gotSubscribed(chatSubscription)
-        })
+        });
         api.on('ChatChangeMode', (chatChangeMode) => {
             this.chatModeChanged(chatChangeMode)
-        })
+        });
         api.on('ChatFollow', (chatFollow) => {
             this.gotFollowed(chatFollow)
-        })
+        });
         api.on('ChatDelete', (chatDelete) => {
             this.messageDeleted(chatDelete)
-        })
+        });
         api.on('ChatBan', (chatBan) => {
             this.userBanned(chatBan)
-        })
+        });
         api.on('ChatModerator', (chatModerator) => {
             this.chatModerator(chatModerator)
-        })
+        });
         api.on('ChatEmoteAdd', (chatEmoteAdd) => {
             this.emoteAdded(chatEmoteAdd)
         })
@@ -105,55 +85,55 @@ export class Masky extends EventEmitter  {
 
 
     public connect() {
-        api  = new API(this.streamer, this.con)
-        api.init()
+        api  = new API(this.streamer, this.con);
+        api.init();
         this.startListeners()
     }
 
 
     public async chatReceived(chatText: any) {
-        const message: string = chatText.content
-        const senderBlockchainName: string = chatText.sender.username
-        const senderDisplayName: string = chatText.sender.displayname
-        const id: string = chatText.id
-        const role: string = chatText.role
+        const message: string = chatText.content;
+        const senderBlockchainName: string = chatText.sender.username;
+        const senderDisplayName: string = chatText.sender.displayname;
+        const id: string = chatText.id;
+        const role: string = chatText.role;
 
         switch (true) {
 
             case message.startsWith('!help'):
-                this.sendChat('Available commands can be found here: ' + commandsList)
+                this.sendChat('Available commands can be found here: ' + commandsList);
                 break;
             case message.startsWith('!credits'):
-                this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2')
-                break
+                this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2');
+                break;
             case message.startsWith('!introduce'):
-                this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do')
-                break
+                this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do');
+                break;
             case message.startsWith('!chuck'):
-                      this.sendChat(await this.getChuck())
-                break
+                      this.sendChat(await this.getChuck());
+                break;
             case message.startsWith('!advice'):
-                this.sendChat(await this.getAdvice())
-                break
+                this.sendChat(await this.getAdvice());
+                break;
             case message.startsWith('!decide'):
-                this.sendChat('@'+ senderDisplayName + ' ' + await this.getDecision())
-                break
+                this.sendChat('@'+ senderDisplayName + ' ' + await this.getDecision());
+                break;
             case message.startsWith('!ud'):
-                let word = message.split(/ (.+)/)[1]
-                this.sendChat(await this.getDefinition(word))
-                break
+                let word = message.split(/ (.+)/)[1];
+                this.sendChat(await this.getDefinition(word));
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
-                break
+                break;
             case message.startsWith(''):
                 break
         }
@@ -185,7 +165,7 @@ export class Masky extends EventEmitter  {
                 if (data.body.list[0] == null) {
                     return 'I did not find any definition for ' + word;
                 } else {
-                    let definition = data.body.list[0].definition
+                    let definition = data.body.list[0].definition;
                     if (definition.length > 140) {
                         let trimmedString = definition.substring(0, 140);
                         return trimmedString
@@ -208,7 +188,7 @@ export class Masky extends EventEmitter  {
             }
         }).then((res) => {
             if(res.errors){
-                console.log('Could not send chat message. Error: ')
+                console.log('Could not send chat message. Error: ');
                 console.log(res.errors)
             }
         })
@@ -220,7 +200,7 @@ export class Masky extends EventEmitter  {
                 username: blockchainName,
         }).then((res) => {
             if(res.errors){
-                console.log('Could not ban user. Error: ')
+                console.log('Could not ban user. Error: ');
                 console.log(res.errors)
             }
         })
@@ -232,7 +212,7 @@ export class Masky extends EventEmitter  {
             username: blockchainName,
         }).then((res) => {
             if(res.errors){
-                console.log('Could not ban user. Error: ')
+                console.log('Could not ban user. Error: ');
                 console.log(res.errors)
             }
         })
@@ -244,7 +224,7 @@ export class Masky extends EventEmitter  {
             displayname: this.streamer.displayname,
         }).then((res) => {
             if (res.errors) {
-                console.log('Could not get banned users. Error: ')
+                console.log('Could not get banned users. Error: ');
                 console.log(res.errors)
             }
             return res.data.userByDisplayName.chatBannedUsers.list
@@ -256,7 +236,7 @@ export class Masky extends EventEmitter  {
             username: name
         }).then((res) => {
             if (res.errors) {
-                console.log('Could not fetch user info. Error: ')
+                console.log('Could not fetch user info. Error: ');
                 console.log(res.errors)
             }
             return res.data
@@ -268,7 +248,7 @@ export class Masky extends EventEmitter  {
             displayname: displayName
         }).then((res) => {
             if (res.errors) {
-                console.log('Could not convert display name to user. Error: ')
+                console.log('Could not convert display name to user. Error: ');
                 console.log(res.errors)
             }
             return res.data.userByDisplayName.username
@@ -280,7 +260,7 @@ export class Masky extends EventEmitter  {
             streamer: blockchainName
         }).then((res) => {
             if (res.err) {
-                console.log('Could not follow user. Error: ')
+                console.log('Could not follow user. Error: ');
                 console.log(res.err.code)
             }
             return res.data
@@ -292,7 +272,7 @@ export class Masky extends EventEmitter  {
             streamer: blockchainName
         }).then((res) => {
             if (res.err) {
-                console.log('Could not unfollow user. Error: ')
+                console.log('Could not unfollow user. Error: ');
                 console.log(res.err.code)
             }
             return res.data
@@ -305,7 +285,7 @@ export class Masky extends EventEmitter  {
             id: id
         }).then((res) => {
             if (res.err) {
-                console.log('Could delete chat Text. Error: ')
+                console.log('Could delete chat Text. Error: ');
                 console.log(res.err.code)
             }
             return res.data

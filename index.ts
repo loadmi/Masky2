@@ -1,4 +1,4 @@
-import { Master } from './master'
+import {Master} from './master'
 
 
 const masterInstance = new Master()

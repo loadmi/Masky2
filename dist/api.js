@@ -13,10 +13,11 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -47,81 +48,48 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
-    result["default"] = mod;
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 var events_1 = require("events");
-var globalDefinitions_1 = require("./globalDefinitions");
-var Websocket = __importStar(require("websocket"));
-var client = new Websocket.client();
 var API = /** @class */ (function (_super) {
     __extends(API, _super);
-    function API(streamer) {
+    function API(streamer, con) {
         var _this = _super.call(this) || this;
         _this.streamer = streamer;
+        _this.con = con;
         return _this;
     }
     API.prototype.init = function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.connect()];
-                    case 1:
-                        _a.sent();
-                        this.subscribe();
-                        return [2 /*return*/];
-                }
+                this.subscribe();
+                return [2 /*return*/];
             });
         });
     };
-    API.prototype.connect = function () {
-        client.connect(globalDefinitions_1.webSocketEndpoint, "graphql-ws");
-    };
     API.prototype.subscribe = function () {
         var _this = this;
-        client.on('connect', function (data) { return __awaiter(_this, void 0, void 0, function () {
-            var res;
-            var _this = this;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        data.sendUTF(JSON.stringify({
-                            type: "connection_init",
-                            payload: {}
-                        }));
-                        console.log(this.streamer.blockchainUsername + ' Connected successfully');
-                        return [4 /*yield*/, data.sendUTF(JSON.stringify({
-                                id: "1",
-                                type: "start",
-                                payload: {
-                                    variables: {
-                                        streamer: this.streamer.blockchainUsername
-                                    },
-                                    extensions: {},
-                                    operationName: "StreamMessageSubscription",
-                                    query: "subscription StreamMessageSubscription($streamer: String!) {\n  streamMessageReceived(streamer: $streamer) {\n    type\n    ... on ChatGift {\n      id\n      gift\n      amount\n      recentCount\n      expireDuration\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatHost {\n      id\n      viewer\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatSubscription {\n      id\n      month\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatChangeMode {\n      mode\n    }\n    ... on ChatText {\n      id\n      content\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatFollow {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatDelete {\n      ids\n    }\n    ... on ChatBan {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatModerator {\n      id\n      ...VStreamChatSenderInfoFrag\n      add\n    }\n    ... on ChatEmoteAdd {\n      id\n      ...VStreamChatSenderInfoFrag\n      emote\n    }\n  }\n}\n\nfragment VStreamChatSenderInfoFrag on SenderInfo {\n  subscribing\n  role\n  roomRole\n  sender {\n    id\n    username\n    displayname\n    avatar\n    partnerStatus\n  }\n}\n"
-                                }
-                            }))];
-                    case 1:
-                        res = _a.sent();
-                        data.on('message', function (message) {
-                            if (message && message.type === "utf8") {
-                                message = JSON.parse(message.utf8Data);
-                                if (message.payload !== undefined) {
-                                    var remMessage = message.payload.data.streamMessageReceived["0"];
-                                    _this.emit(remMessage.__typename, remMessage);
-                                }
-                            }
-                        });
-                        return [2 /*return*/];
+        this.con.sendUTF(JSON.stringify({
+            id: this.streamer.blockchainUsername,
+            type: "start",
+            payload: {
+                variables: {
+                    streamer: this.streamer.blockchainUsername
+                },
+                extensions: {},
+                operationName: "StreamMessageSubscription",
+                query: "subscription StreamMessageSubscription($streamer: String!) {\n  streamMessageReceived(streamer: $streamer) {\n    type\n    ... on ChatGift {\n      id\n      gift\n      amount\n      recentCount\n      expireDuration\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatHost {\n      id\n      viewer\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatSubscription {\n      id\n      month\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatChangeMode {\n      mode\n    }\n    ... on ChatText {\n      id\n      content\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatFollow {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatDelete {\n      ids\n    }\n    ... on ChatBan {\n      id\n      ...VStreamChatSenderInfoFrag\n    }\n    ... on ChatModerator {\n      id\n      ...VStreamChatSenderInfoFrag\n      add\n    }\n    ... on ChatEmoteAdd {\n      id\n      ...VStreamChatSenderInfoFrag\n      emote\n    }\n  }\n}\n\nfragment VStreamChatSenderInfoFrag on SenderInfo {\n  subscribing\n  role\n  roomRole\n  sender {\n    id\n    username\n    displayname\n    avatar\n    partnerStatus\n  }\n}\n"
+            }
+        }));
+        console.log('connected user ' + this.streamer.blockchainUsername);
+        this.con.on('message', function (message) {
+            if (message && message.type === "utf8") {
+                message = JSON.parse(message.utf8Data);
+                if (message.payload !== undefined && message.payload.data) {
+                    var remMessage = message.payload.data.streamMessageReceived["0"];
+                    _this.emit(remMessage.__typename, remMessage);
                 }
-            });
-        }); });
+            }
+        });
     };
     return API;
 }(events_1.EventEmitter));
