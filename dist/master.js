@@ -44,6 +44,7 @@ var websocket_1 = require("websocket");
 var socket = new websocket_1.client;
 var express = require('express');
 var dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
+//const dataStore = require('data-store')({ path: 'gs://maskybot.appspot.com/store.json' });
 var userArr = [];
 var con = null;
 var Master = /** @class */ (function () {
@@ -270,8 +271,9 @@ var Master = /** @class */ (function () {
                 }
             });
         }); });
-        app.listen(3000, function () {
-            console.log('Masky listening on port 3000!');
+        var port = process.env.PORT || 8080;
+        app.listen(port, function () {
+            console.log('Masky listening on port ' + port);
         });
     };
     Master.prototype.fetchQuery = function (query, variables) {

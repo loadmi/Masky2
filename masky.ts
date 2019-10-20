@@ -15,12 +15,21 @@ import {
     UnfollowUser
 } from './graphql.json'
 import {connection} from "websocket";
-
 let api: API = null;
-
 const { createApolloFetch } = require('apollo-fetch');
+const cleverbot = require("cleverbot-free");
+const cleverbotContext: Array<string> = []
 
 export class Masky extends EventEmitter  {
+    public guessingNumber: number = this.getRandomInt(100)
+    public Admins: Array<string> = [this.streamer.displayname.toLowerCase(), 'loadmi', 'deanna44']
+    public isAlive: Boolean = true
+    public giveawayRunning: Boolean = false
+    public giveawayEntries: Array<String> = []
+    public announcementDuration: number = 15
+    public announcementInterval: number = 60
+    public announcementIteration = 1
+    public chatIDs: Array<string> = []
 
     constructor( public streamer: streamer, public con: connection) {
         super()
@@ -94,49 +103,242 @@ export class Masky extends EventEmitter  {
     public async chatReceived(chatText: any) {
         const message: string = chatText.content;
         const senderBlockchainName: string = chatText.sender.username;
-        const senderDisplayName: string = chatText.sender.displayname;
+        let senderDisplayName: string = chatText.sender.displayname;
         const id: string = chatText.id;
         const role: string = chatText.role;
+        const argument = message.split(/ (.+)/)[1]
 
-        switch (true) {
+        this.chatIDs.push(chatText.id)
 
-            case message.startsWith('!help'):
-                this.sendChat('Available commands can be found here: ' + commandsList);
-                break;
-            case message.startsWith('!credits'):
-                this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2');
-                break;
-            case message.startsWith('!introduce'):
-                this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do');
-                break;
-            case message.startsWith('!chuck'):
-                      this.sendChat(await this.getChuck());
-                break;
-            case message.startsWith('!advice'):
-                this.sendChat(await this.getAdvice());
-                break;
-            case message.startsWith('!decide'):
-                this.sendChat('@'+ senderDisplayName + ' ' + await this.getDecision());
-                break;
-            case message.startsWith('!ud'):
-                let word = message.split(/ (.+)/)[1];
-                this.sendChat(await this.getDefinition(word));
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break;
-            case message.startsWith(''):
-                break
+        if( senderDisplayName.toLowerCase() === "deanna44"){
+            senderDisplayName = senderDisplayName + ', my queen'
         }
+
+
+        if(this.isAlive === true) {
+
+            switch (true) {
+
+                case message.startsWith('!help'):
+                    this.sendChat('Available commands can be found here: ' + commandsList);
+                    break;
+                case message.startsWith('!credits'):
+                    this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2');
+                    break;
+                case message.startsWith('!introduce'):
+                    this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do');
+                    break;
+                case message.startsWith('!chuck'):
+                    this.sendChat(await this.getChuck());
+                    break;
+                case message.startsWith('!advice'):
+                    this.sendChat(await this.getAdvice());
+                    break;
+                case message.startsWith('!decide'):
+                    this.sendChat('@' + senderDisplayName + ' ' + await this.getDecision());
+                    break;
+                case message.startsWith('!ud'):
+                    this.sendChat(await this.getDefinition(argument));
+                    break;
+                case message.startsWith('!dice'):
+                    this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice())
+                    break;
+                case message.startsWith('!guess'):
+                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(argument))
+                    break;
+                case message.startsWith('!lino'):
+                    if (argument) {
+                        const blockchainName = await this.displayNameToUser(argument)
+                        if (blockchainName) {
+                            this.getUserData(blockchainName).then((data) => {
+                                const balance = Math.round(data.user.wallet.balance / 100000)
+                                this.sendChat('@' + senderDisplayName + ' The user ' + argument + ' currently has ' + balance + ' linos')
+                            })
+                        } else {
+                            this.sendChat('@' + senderDisplayName + ' this user does not exist')
+                        }
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' this user does not exist')
+                    }
+                    break;
+                case message.startsWith('!showadmins'):
+                    this.sendChat('@' + senderDisplayName + ' Current admins: ' + this.Admins.toString())
+                    break;
+                case message.startsWith('!enter'):
+                    if (this.giveawayRunning === true) {
+                        if (this.giveawayEntries.indexOf(senderDisplayName) > -1) {
+                            this.sendChat('@' + senderDisplayName + ' You are already participating')
+                        } else {
+                            this.giveawayEntries.push(senderDisplayName)
+                            this.sendChat('@' + senderDisplayName + ' You have been entered into the giveaway')
+                        }
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' There is no giveaway active currently')
+                    }
+                    break;
+                case message.startsWith('NEWNONADMINCOMMANDS'):
+                    break;
+                case message.startsWith('!addadmin'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        if (this.Admins.indexOf(argument) > -1) {
+                            this.sendChat(argument + ' Is already an admin')
+                        } else {
+                            this.Admins.push(argument)
+                            this.sendChat(argument + ' has been added to the admin list!')
+                        }
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!removeadmin'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        if (this.Admins.indexOf(argument) > -1) {
+                            for (let i = this.Admins.length - 1; i >= 0; i--) {
+                                if (this.Admins[i] === argument) {
+                                    this.Admins.splice(i, 1);
+                                }
+                            }
+                            this.sendChat(argument + ' has been removed from the admin list')
+                        } else {
+                            this.sendChat(argument + ' Is not an admin')
+                        }
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!kill'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.isAlive = false
+                        this.sendChat('Cyber-suicide initiated - Tell my kids i love them')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!startgiveaway'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.giveawayRunning = true
+                        this.giveawayEntries = []
+                        this.sendChat('A giveaway has started, type !enter to enter')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!endgiveaway'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.giveawayRunning = false
+                        this.giveawayEntries = []
+                        this.sendChat('The giveaway has ended.')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!lucky'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        if (typeof this.giveawayEntries !== undefined && this.giveawayEntries.length > 0) {
+                            const lucky = this.giveawayEntries[Math.floor(Math.random() * this.giveawayEntries.length)];
+                            this.sendChat('The Lucky winner is: @' + lucky)
+                        } else {
+                            this.sendChat('There is no Giveaway running at the moment')
+                        }
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!clear'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.chatIDs.forEach((chatID) => {
+                            this.deleteChat(chatID)
+                        })
+                        this.chatIDs = []
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!setinterval'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.announcementInterval = argument
+                        this.sendChat('I have set the announcement interval to every ' + argument + ' seconds')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!setduration'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.announcementDuration = argument
+                        this.sendChat('I have set the announcement duration to ' + argument + ' times')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!announce'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        console.log(argument)
+                        this.doAnnouncement(argument)
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+            }
+            if(message.startsWith('@Masky_bot')){
+                cleverbot(message, cleverbotContext).then(response => {
+                    cleverbotContext.push(message)
+                    cleverbotContext.push(response)
+                    this.sendChat('@' + senderDisplayName + ' ' + response)
+                });
+
+            }
+        } else {
+            if(message === '!revive'){
+                if (this.isAdmin(senderDisplayName)) {
+                    this.isAlive = true
+                    this.sendChat('Bot has been revived!')
+                } else {
+                    this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                }
+            }
+        }
+    }
+
+    public doAnnouncement(message) {
+        setTimeout(() => {
+            if (this.isAlive === true) {
+                this.sendChat(message)
+            }
+            this.announcementIteration++;
+            if ( this.announcementIteration <= this.announcementDuration) {
+                this.doAnnouncement(message);
+            } else {
+                this.announcementIteration = 1
+            }
+        }, this.announcementInterval * 1000)
+    }
+
+
+    public isAdmin(user) {
+        user = user.toLowerCase()
+        if (this.Admins.indexOf(user) > -1) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public checkGuess(guess: number){
+        if (!guess){return 'your guess isn\'t a number'}
+        console.log(this.guessingNumber)
+        if (this.guessingNumber == guess){
+            this.guessingNumber = this.getRandomInt(100)
+            return 'WOW! That\'s my number... Regenerating new random number (1-100)'
+        } else if (guess < this.guessingNumber){
+            return 'Nope, that\'s not my number. My number is higher (1-100)'
+        } else {
+            return 'Nope, that\'s not my number. My number is lower (1-100)'
+        }
+    }
+    public getRandomInt(max) {
+        return Math.floor(Math.random() * Math.floor(max));
+    }
+    public getDice(){
+        return this.getRandomInt(10)
     }
 
     public async getChuck() {
@@ -247,11 +449,14 @@ export class Masky extends EventEmitter  {
         return this.fetchQuery(DisplaynameToUser, {
             displayname: displayName
         }).then((res) => {
-            if (res.errors) {
-                console.log('Could not convert display name to user. Error: ');
-                console.log(res.errors)
+            if (!res.data.userByDisplayName) {
+                console.log('Could not convert display name to user. Error: ')
+                console.log(res.data)
+                return null
+            } else {
+                return res.data.userByDisplayName.username
             }
-            return res.data.userByDisplayName.username
+
         })
     }
 
@@ -293,20 +498,41 @@ export class Masky extends EventEmitter  {
     }
 
     public gotHosted(chatHost: any){
-
-        console.log(chatHost)
+        if(this.isAlive === true) {
+            let viewerCount = chatHost.viewer;
+            let senderDisplayname = chatHost.sender.displayname;
+            if( senderDisplayname.toLowerCase() === "deanna44"){
+                this.sendChat('Feel honored, the queen has hosted you!')
+            } else {
+                this.sendChat('Thank you for the host with ' + viewerCount + ' viewers,  @' + senderDisplayname)
+            }
+        }
     }
 
     public giftReceived(chatGift: any){
-        console.log(chatGift)
+        if(this.isAlive === true) {
+            let senderDisplayname = chatGift.sender.displayname;
+            if( senderDisplayname.toLowerCase() === "deanna44"){
+                this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
+            } else {
+                this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname)
+            }
+
+        }
     }
 
     public gotSubscribed(chatSubscription: any){
-        console.log(chatSubscription)
+        if(this.isAlive === true) {
+            let senderDisplayname = chatSubscription.sender.displayname;
+            this.sendChat('Thank you for the subscription, @' + senderDisplayname)
+        }
     }
 
     public gotFollowed(chatFollow: any){
-        console.log(chatFollow)
+        if(this.isAlive === true) {
+            let senderDisplayname = chatFollow.sender.displayname;
+            this.sendChat('Thank you for the follow, @' + senderDisplayname)
+        }
     }
 
     public messageDeleted(chatDelete: any){

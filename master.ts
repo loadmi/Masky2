@@ -7,6 +7,7 @@ import {client} from 'websocket'
 const socket = new client;
 const express = require('express');
 const dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
+//const dataStore = require('data-store')({ path: 'gs://maskybot.appspot.com/store.json' });
 let userArr: Array<Masky> = []
 let con = null
 

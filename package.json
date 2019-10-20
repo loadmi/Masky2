@@ -20,6 +20,7 @@
     "apollo-fetch": "^0.7.0",
     "apollo-link-ws": "^1.0.19",
     "apollo-server": "^2.9.6",
+    "cleverbot-free": "^1.0.3",
     "data-store": "^4.0.3",
     "esm": "^3.2.25",
     "express": "^4.17.1",
