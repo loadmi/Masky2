@@ -57,14 +57,27 @@ var api_1 = require("./api");
 var globalDefinitions_1 = require("./globalDefinitions");
 var unirest_1 = __importDefault(require("unirest"));
 var graphql_json_1 = require("./graphql.json");
+var master_1 = require("./master");
 var api = null;
 var createApolloFetch = require('apollo-fetch').createApolloFetch;
+var cleverbot = require("cleverbot-free");
+var cleverbotContext = [];
 var Masky = /** @class */ (function (_super) {
     __extends(Masky, _super);
     function Masky(streamer, con) {
         var _this = _super.call(this) || this;
         _this.streamer = streamer;
         _this.con = con;
+        _this.guessingNumber = _this.getRandomInt(100);
+        _this.Admins = [_this.streamer.displayname.toLowerCase(), 'loadmi', 'deanna44'];
+        _this.isAlive = true;
+        _this.giveawayRunning = false;
+        _this.giveawayEntries = [];
+        _this.announcementDuration = 15;
+        _this.announcementInterval = 60;
+        _this.announcementIteration = 1;
+        _this.chatIDs = [];
+        _this.isVerified = false;
         return _this;
     }
     Masky.prototype.fetchQuery = function (query, variables) {
@@ -86,45 +99,99 @@ var Masky = /** @class */ (function (_super) {
     };
     Masky.prototype.startListeners = function () {
         var _this = this;
-        api.on('ChatText', function (chatText) {
-            _this.chatReceived(chatText);
+        api.on('ChatText', function (chatText, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.chatReceived(chatText);
+            }
         });
-        api.on('ChatHost', function (chatHost) {
-            _this.gotHosted(chatHost);
+        api.on('ChatHost', function (chatHost, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.gotHosted(chatHost);
+            }
         });
-        api.on('ChatGift', function (chatGift) {
-            _this.giftReceived(chatGift);
+        api.on('ChatGift', function (chatGift, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.giftReceived(chatGift);
+            }
         });
-        api.on('ChatSubscription', function (chatSubscription) {
-            _this.gotSubscribed(chatSubscription);
+        api.on('ChatSubscription', function (chatSubscription, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.gotSubscribed(chatSubscription);
+            }
         });
-        api.on('ChatChangeMode', function (chatChangeMode) {
-            _this.chatModeChanged(chatChangeMode);
+        api.on('ChatChangeMode', function (chatChangeMode, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.chatModeChanged(chatChangeMode);
+            }
         });
-        api.on('ChatFollow', function (chatFollow) {
-            _this.gotFollowed(chatFollow);
+        api.on('ChatFollow', function (chatFollow, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.gotFollowed(chatFollow);
+            }
         });
-        api.on('ChatDelete', function (chatDelete) {
-            _this.messageDeleted(chatDelete);
+        api.on('ChatDelete', function (chatDelete, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.messageDeleted(chatDelete);
+            }
         });
-        api.on('ChatBan', function (chatBan) {
-            _this.userBanned(chatBan);
+        api.on('ChatBan', function (chatBan, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.userBanned(chatBan);
+            }
         });
-        api.on('ChatModerator', function (chatModerator) {
-            _this.chatModerator(chatModerator);
+        api.on('ChatModerator', function (chatModerator, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.chatModerator(chatModerator);
+            }
         });
-        api.on('ChatEmoteAdd', function (chatEmoteAdd) {
-            _this.emoteAdded(chatEmoteAdd);
+        api.on('ChatEmoteAdd', function (chatEmoteAdd, conversation) {
+            if (conversation === _this.streamer.blockchainUsername) {
+                _this.emoteAdded(chatEmoteAdd);
+            }
         });
     };
     Masky.prototype.connect = function () {
-        api = new api_1.API(this.streamer, this.con);
-        api.init();
-        this.startListeners();
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                this.getConfig(this.streamer.blockchainUsername).then(function (config) {
+                    _this.isAlive = config.verified;
+                    _this.isVerified = config.verified;
+                    _this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!');
+                    console.log('Setting isAlive to false on ' + _this.streamer.blockchainUsername + ' because the acount is not verified');
+                });
+                api = new api_1.API(this.streamer, this.con);
+                api.init();
+                this.startListeners();
+                return [2 /*return*/];
+            });
+        });
+    };
+    Masky.prototype.getConfig = function (blockchainName) {
+        return master_1.db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then(function (query) {
+            if (query.size !== 1) {
+                return false;
+            }
+            else {
+                return query.docs[0].data().config;
+            }
+        });
+    };
+    Masky.prototype.setConfig = function (blockchainName, config) {
+        return master_1.db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then(function (query) {
+            query.docs[0].ref.update({
+                config: config
+            });
+        });
     };
     Masky.prototype.chatReceived = function (chatText) {
         return __awaiter(this, void 0, void 0, function () {
-            var message, senderBlockchainName, senderDisplayName, id, role, _a, _b, _c, _d, _e, word, _f;
+            var message, senderBlockchainName, senderDisplayName, id, role, argument, _a, _b, _c, _d, _e, _f, blockchainName, i, lucky;
+            var _this = this;
             return __generator(this, function (_g) {
                 switch (_g.label) {
                     case 0:
@@ -133,6 +200,30 @@ var Masky = /** @class */ (function (_super) {
                         senderDisplayName = chatText.sender.displayname;
                         id = chatText.id;
                         role = chatText.role;
+                        argument = message.split(/ (.+)/)[1];
+                        this.chatIDs.push(chatText.id);
+                        if (senderDisplayName.toLowerCase() === "deanna44") {
+                            senderDisplayName = senderDisplayName + ', my queen';
+                        }
+                        if (this.isVerified === false) {
+                            if (message.startsWith('!verify')) {
+                                if (chatText.roomRole === 'Owner' || chatText.sender.displayname === 'Loadmi') {
+                                    this.getConfig(this.streamer.blockchainUsername).then(function (config) {
+                                        config.verified = true;
+                                        _this.isVerified = true;
+                                        _this.isAlive = true;
+                                        _this.setConfig(_this.streamer.blockchainUsername, config).then(function (result) {
+                                            console.log('verified user ' + _this.streamer.blockchainUsername);
+                                            _this.sendChat('Successfully verified chanel! You can use Masky now.');
+                                        });
+                                    });
+                                }
+                                else {
+                                    this.sendChat('Only the channel owner can verify a channel. You are not channel Admin');
+                                }
+                            }
+                        }
+                        if (!(this.isAlive === true)) return [3 /*break*/, 32];
                         _a = true;
                         switch (_a) {
                             case message.startsWith('!help'): return [3 /*break*/, 1];
@@ -142,61 +233,284 @@ var Masky = /** @class */ (function (_super) {
                             case message.startsWith('!advice'): return [3 /*break*/, 6];
                             case message.startsWith('!decide'): return [3 /*break*/, 8];
                             case message.startsWith('!ud'): return [3 /*break*/, 10];
-                            case message.startsWith(''): return [3 /*break*/, 12];
-                            case message.startsWith(''): return [3 /*break*/, 13];
-                            case message.startsWith(''): return [3 /*break*/, 14];
-                            case message.startsWith(''): return [3 /*break*/, 15];
-                            case message.startsWith(''): return [3 /*break*/, 16];
-                            case message.startsWith(''): return [3 /*break*/, 17];
-                            case message.startsWith(''): return [3 /*break*/, 18];
+                            case message.startsWith('!dice'): return [3 /*break*/, 12];
+                            case message.startsWith('!guess'): return [3 /*break*/, 13];
+                            case message.startsWith('!lino'): return [3 /*break*/, 14];
+                            case message.startsWith('!showadmins'): return [3 /*break*/, 18];
+                            case message.startsWith('!enter'): return [3 /*break*/, 19];
+                            case message.startsWith('NEWNONADMINCOMMANDS'): return [3 /*break*/, 20];
+                            case message.startsWith('!addadmin'): return [3 /*break*/, 21];
+                            case message.startsWith('!removeadmin'): return [3 /*break*/, 22];
+                            case message.startsWith('!kill'): return [3 /*break*/, 23];
+                            case message.startsWith('!startgiveaway'): return [3 /*break*/, 24];
+                            case message.startsWith('!endgiveaway'): return [3 /*break*/, 25];
+                            case message.startsWith('!lucky'): return [3 /*break*/, 26];
+                            case message.startsWith('!clear'): return [3 /*break*/, 27];
+                            case message.startsWith('!setinterval'): return [3 /*break*/, 28];
+                            case message.startsWith('!setduration'): return [3 /*break*/, 29];
+                            case message.startsWith('!announce'): return [3 /*break*/, 30];
                         }
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 1:
                         this.sendChat('Available commands can be found here: ' + globalDefinitions_1.commandsList);
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 2:
                         this.sendChat('Masky is an opensource chatbot for Dlive made by https://dlive.tv/loadmi find the whole project at https://github.com/loadmi/Masky2');
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 3:
                         this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do');
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 4:
                         _b = this.sendChat;
                         return [4 /*yield*/, this.getChuck()];
                     case 5:
                         _b.apply(this, [_g.sent()]);
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 6:
                         _c = this.sendChat;
                         return [4 /*yield*/, this.getAdvice()];
                     case 7:
                         _c.apply(this, [_g.sent()]);
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 8:
                         _d = this.sendChat;
                         _e = '@' + senderDisplayName + ' ';
                         return [4 /*yield*/, this.getDecision()];
                     case 9:
                         _d.apply(this, [_e + (_g.sent())]);
-                        return [3 /*break*/, 19];
+                        return [3 /*break*/, 31];
                     case 10:
-                        word = message.split(/ (.+)/)[1];
                         _f = this.sendChat;
-                        return [4 /*yield*/, this.getDefinition(word)];
+                        return [4 /*yield*/, this.getDefinition(argument)];
                     case 11:
                         _f.apply(this, [_g.sent()]);
-                        return [3 /*break*/, 19];
-                    case 12: return [3 /*break*/, 19];
-                    case 13: return [3 /*break*/, 19];
-                    case 14: return [3 /*break*/, 19];
-                    case 15: return [3 /*break*/, 19];
-                    case 16: return [3 /*break*/, 19];
-                    case 17: return [3 /*break*/, 19];
-                    case 18: return [3 /*break*/, 19];
-                    case 19: return [2 /*return*/];
+                        return [3 /*break*/, 31];
+                    case 12:
+                        this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice());
+                        return [3 /*break*/, 31];
+                    case 13:
+                        this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(+argument));
+                        return [3 /*break*/, 31];
+                    case 14:
+                        if (!argument) return [3 /*break*/, 16];
+                        return [4 /*yield*/, this.displayNameToUser(argument)];
+                    case 15:
+                        blockchainName = _g.sent();
+                        if (blockchainName) {
+                            this.getUserData(blockchainName).then(function (data) {
+                                var balance = Math.round(data.user.wallet.balance / 100000);
+                                _this.sendChat('@' + senderDisplayName + ' The user ' + argument + ' currently has ' + balance + ' linos');
+                            });
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' this user does not exist');
+                        }
+                        return [3 /*break*/, 17];
+                    case 16:
+                        this.sendChat('@' + senderDisplayName + ' this user does not exist');
+                        _g.label = 17;
+                    case 17: return [3 /*break*/, 31];
+                    case 18:
+                        this.sendChat('@' + senderDisplayName + ' Current admins: ' + this.Admins.toString());
+                        return [3 /*break*/, 31];
+                    case 19:
+                        if (this.giveawayRunning === true) {
+                            if (this.giveawayEntries.indexOf(senderDisplayName) > -1) {
+                                this.sendChat('@' + senderDisplayName + ' You are already participating');
+                            }
+                            else {
+                                this.giveawayEntries.push(senderDisplayName);
+                                this.sendChat('@' + senderDisplayName + ' You have been entered into the giveaway');
+                            }
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' There is no giveaway active currently');
+                        }
+                        return [3 /*break*/, 31];
+                    case 20: return [3 /*break*/, 31];
+                    case 21:
+                        if (this.isAdmin(senderDisplayName)) {
+                            if (this.Admins.indexOf(argument) > -1) {
+                                this.sendChat(argument + ' Is already an admin');
+                            }
+                            else {
+                                this.Admins.push(argument);
+                                this.sendChat(argument + ' has been added to the admin list!');
+                            }
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 22:
+                        if (this.isAdmin(senderDisplayName)) {
+                            if (this.Admins.indexOf(argument) > -1) {
+                                for (i = this.Admins.length - 1; i >= 0; i--) {
+                                    if (this.Admins[i] === argument) {
+                                        this.Admins.splice(i, 1);
+                                    }
+                                }
+                                this.sendChat(argument + ' has been removed from the admin list');
+                            }
+                            else {
+                                this.sendChat(argument + ' Is not an admin');
+                            }
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 23:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.isAlive = false;
+                            this.sendChat('Cyber-suicide initiated - Tell my kids i love them');
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 24:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.giveawayRunning = true;
+                            this.giveawayEntries = [];
+                            this.sendChat('A giveaway has started, type !enter to enter');
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 25:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.giveawayRunning = false;
+                            this.giveawayEntries = [];
+                            this.sendChat('The giveaway has ended.');
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 26:
+                        if (this.isAdmin(senderDisplayName)) {
+                            if (typeof this.giveawayEntries !== undefined && this.giveawayEntries.length > 0) {
+                                lucky = this.giveawayEntries[Math.floor(Math.random() * this.giveawayEntries.length)];
+                                this.sendChat('The Lucky winner is: @' + lucky);
+                            }
+                            else {
+                                this.sendChat('There is no Giveaway running at the moment');
+                            }
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 27:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.chatIDs.forEach(function (chatID) {
+                                _this.deleteChat(chatID);
+                            });
+                            this.chatIDs = [];
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 28:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.announcementInterval = +argument;
+                            this.sendChat('I have set the announcement interval to every ' + argument + ' seconds');
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 29:
+                        if (this.isAdmin(senderDisplayName)) {
+                            this.announcementDuration = +argument;
+                            this.sendChat('I have set the announcement duration to ' + argument + ' times');
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        return [3 /*break*/, 31];
+                    case 30:
+                        if (this.isAdmin(senderDisplayName)) {
+                            console.log(argument);
+                            this.doAnnouncement(argument);
+                        }
+                        else {
+                            this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                        }
+                        _g.label = 31;
+                    case 31:
+                        if (message.startsWith('@Masky_bot')) {
+                            cleverbot(message, cleverbotContext).then(function (response) {
+                                cleverbotContext.push(message);
+                                cleverbotContext.push(response);
+                                _this.sendChat('@' + senderDisplayName + ' ' + response);
+                            });
+                        }
+                        return [3 /*break*/, 33];
+                    case 32:
+                        if (message === '!revive') {
+                            if (this.isAdmin(senderDisplayName)) {
+                                this.isAlive = true;
+                                this.sendChat('Bot has been revived!');
+                            }
+                            else {
+                                this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!');
+                            }
+                        }
+                        _g.label = 33;
+                    case 33: return [2 /*return*/];
                 }
             });
         });
+    };
+    Masky.prototype.doAnnouncement = function (message) {
+        var _this = this;
+        setTimeout(function () {
+            if (_this.isAlive === true) {
+                _this.sendChat(message);
+            }
+            _this.announcementIteration++;
+            if (_this.announcementIteration <= _this.announcementDuration) {
+                _this.doAnnouncement(message);
+            }
+            else {
+                _this.announcementIteration = 1;
+            }
+        }, this.announcementInterval * 1000);
+    };
+    Masky.prototype.isAdmin = function (user) {
+        user = user.toLowerCase();
+        if (this.Admins.indexOf(user) > -1) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    };
+    Masky.prototype.checkGuess = function (guess) {
+        if (!guess) {
+            return 'your guess isn\'t a number';
+        }
+        console.log(this.guessingNumber);
+        if (this.guessingNumber == guess) {
+            this.guessingNumber = this.getRandomInt(100);
+            return 'WOW! That\'s my number... Regenerating new random number (1-100)';
+        }
+        else if (guess < this.guessingNumber) {
+            return 'Nope, that\'s not my number. My number is higher (1-100)';
+        }
+        else {
+            return 'Nope, that\'s not my number. My number is lower (1-100)';
+        }
+    };
+    Masky.prototype.getRandomInt = function (max) {
+        return Math.floor(Math.random() * Math.floor(max));
+    };
+    Masky.prototype.getDice = function () {
+        return this.getRandomInt(10);
     };
     Masky.prototype.getChuck = function () {
         return __awaiter(this, void 0, void 0, function () {
@@ -313,11 +627,14 @@ var Masky = /** @class */ (function (_super) {
         return this.fetchQuery(graphql_json_1.DisplaynameToUser, {
             displayname: displayName
         }).then(function (res) {
-            if (res.errors) {
+            if (!res.data.userByDisplayName) {
                 console.log('Could not convert display name to user. Error: ');
-                console.log(res.errors);
+                console.log(res.data);
+                return null;
             }
-            return res.data.userByDisplayName.username;
+            else {
+                return res.data.userByDisplayName.username;
+            }
         });
     };
     Masky.prototype.followUser = function (blockchainName) {
@@ -355,16 +672,39 @@ var Masky = /** @class */ (function (_super) {
         });
     };
     Masky.prototype.gotHosted = function (chatHost) {
-        console.log(chatHost);
+        if (this.isAlive === true) {
+            var viewerCount = chatHost.viewer;
+            var senderDisplayname = chatHost.sender.displayname;
+            if (senderDisplayname.toLowerCase() === "deanna44") {
+                this.sendChat('Feel honored, the queen has hosted you!');
+            }
+            else {
+                this.sendChat('Thank you for the host with ' + viewerCount + ' viewers,  @' + senderDisplayname);
+            }
+        }
     };
     Masky.prototype.giftReceived = function (chatGift) {
-        console.log(chatGift);
+        if (this.isAlive === true) {
+            var senderDisplayname = chatGift.sender.displayname;
+            if (senderDisplayname.toLowerCase() === "deanna44") {
+                this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname);
+            }
+            else {
+                this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname);
+            }
+        }
     };
     Masky.prototype.gotSubscribed = function (chatSubscription) {
-        console.log(chatSubscription);
+        if (this.isAlive === true) {
+            var senderDisplayname = chatSubscription.sender.displayname;
+            this.sendChat('Thank you for the subscription, @' + senderDisplayname);
+        }
     };
     Masky.prototype.gotFollowed = function (chatFollow) {
-        console.log(chatFollow);
+        if (this.isAlive === true) {
+            var senderDisplayname = chatFollow.sender.displayname;
+            this.sendChat('Thank you for the follow, @' + senderDisplayname);
+        }
     };
     Masky.prototype.messageDeleted = function (chatDelete) {
         console.log(chatDelete);

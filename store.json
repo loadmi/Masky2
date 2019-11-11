@@ -1,5 +1,12 @@
 {
   "data": {},
   "users": [
+    {
+      "blockchainName": "dlive-bwxglwsybg",
+      "config": {
+        "userKey": "00ZbqVza4BzuG4OBfb3A",
+        "running": true
+      }
+    }
   ]
 }

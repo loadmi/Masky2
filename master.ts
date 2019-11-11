@@ -3,23 +3,37 @@ import {apiEndpoint, apiKey, webSocketEndpoint} from "./globalDefinitions";
 import {createApolloFetch} from "apollo-fetch";
 import {DisplaynameToUser, GetUserInfo} from './graphql.json'
 import {client} from 'websocket'
+import {dbUser, dbUserConfig} from "./types";
 
+
+
+const admin = require('firebase-admin');
+const serviceAccount = require('./maskybot-7a359f2d7e57.json');
 const socket = new client;
 const express = require('express');
-const dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
-//const dataStore = require('data-store')({ path: 'gs://maskybot.appspot.com/store.json' });
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+const cors = require('cors')
+export const db = admin.firestore();
 let userArr: Array<Masky> = []
 let con = null
 
 export class Master{
 
-    public newDataStoreUser(blockchainName: string, userKey: string){
-        dataStore.union('users', {
-            blockchainName: blockchainName,
+    public async newDbUser(blockchainName: string, userKey: string, email: string) {
+        email = email ? email : ''
+        const userRef = await db.collection('users').doc()
+        const userData = {
+            blockchainName,
+            email,
             config: {
                 userKey: userKey,
-                running: true
-            }});
+                running: true,
+                verified: false
+            }
+        }
+        userRef.set(userData)
     }
 
     public async connectAPI() {
@@ -39,9 +53,11 @@ export class Master{
 
     }
 
-    public loadUsers() {
-            dataStore.get('users').forEach(async (user) => {
-                if(user.config.running){
+    public async loadUsers() {
+        db.collection('users').get().then((usersSnapshot) => {
+            usersSnapshot.docs.forEach((userDoc) => {
+                const user: dbUser = userDoc.data()
+                if (user.config.running) {
                     this.fetchQuery(GetUserInfo, {
                         username: user.blockchainName
                     }).then((me) => {
@@ -54,87 +70,127 @@ export class Master{
                         masky.connect()
                     })
                 }
+            })
+            console.log('loaded users')
         })
-        console.log('loaded users')
-
     }
-
    public async start() {
-
         this.connectAPI()
        this.startServer()
    }
-    public getConfig(blockchainName: string){
-        return dataStore.get('users').find(x => x.blockchainName == blockchainName) ?
-            dataStore.get('users').find(x => x.blockchainName == blockchainName).config : false
+    public getConfig(blockchainName: string): Promise<any> {
+        return db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then((query) => {
+            if (query.size !== 1){
+                return false
+            } else {
+                return query.docs[0].data().config
+
+            }
+        })
     }
 
-    public async registerBot(username: string) {
+    public async registerBot(username: string, emailLink: string) {
         const userKey = this.generateKey(20)
         const blockchainName = await this.displayNameToUser(username)
         if (!blockchainName){
-            return 'This dlive user does not exist!'
+            return {success: false, message: 'This dlive user does not exist!'}
         }else{
-        if(!this.getConfig(blockchainName)){
-            this.newDataStoreUser(blockchainName, userKey)
-            const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con )
-            userArr.push(masky)
-            masky.connect()
-            return `
-        Successfully registered Masky for user ${username}<br>
-        Your API Key is : ${userKey}<br>
-        current Status: Running
-        `
-        } else {
-           return 'User ' + username + ' is already registered!'
-        }}
+           return this.getConfig(blockchainName).then((config: any) => {
+                if(!config){
+
+                    this.newDbUser(blockchainName, userKey, emailLink)
+                    const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con )
+                    userArr.push(masky)
+                    masky.connect()
+                    return {success: true, apikey: userKey}
+        //             return `
+        // Successfully registered Masky for user ${username}<br>
+        // Your API Key is : ${userKey}<br>
+        // current Status: Running
+        // `
+                } else {
+                    return {success: false, message: 'User is already registered'}
+                }
+            })
+        }
 
     }
     public async startBot(username: string, key: string) {
-        const blockchainName = await this.displayNameToUser(username)
-        const userKey = this.getConfig(blockchainName).userKey
-        if(key === userKey){
-            if(this.isRunning(username)){
-                return 'Bot is already running on user ' + username
+        return this.displayNameToUser(username).then((blockchainName) => {
+            if(!blockchainName){return 'This user does not exist'}
+            return this.getConfig(blockchainName).then((config: dbUserConfig) => {
+                if(!config){return 'This user is not registered'}
+                const userKey = config.userKey
+                if(key === userKey){
+                    if(this.isRunning(username)){
+                        return 'Bot is already running on user ' + username
+                    } else {
+                        const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con)
+                        userArr.push(masky)
+                        masky.connect()
+                        config.running = true
+                        this.setConfig(blockchainName, config)
+                        return 'Bot has been started on user ' + username
+                    }
+
+
+                } else {
+                    return 'This API key is not valid for user ' + username
+                }
+            })
+
+        })
+
+    }
+    public async getVerificationState(username: string) {
+        return this.displayNameToUser(username).then((blockchainName) => {
+            if(blockchainName){
+                return this.getConfig(blockchainName).then((config) => {
+                    return config.verified
+                })
             } else {
-                const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con)
-                userArr.push(masky)
-                masky.connect()
-                let config = this.getConfig(blockchainName)
-                config.running = true
-                this.setConfig(blockchainName, config)
-                return 'Bot has been started on user ' + username
+                return 'User does not exist on Dlive'
             }
 
+        })
 
-        } else {
-            return 'This API key is not valid for user ' + username
-        }
     }
     public async stopBot(username: string, key: string) {
-        const blockchainName = await this.displayNameToUser(username)
-        const userKey = this.getConfig(blockchainName).userKey
-        if (key === userKey) {
-            if(this.isRunning(username)){
-                const masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
-                await this.killSubscription(masky.streamer.blockchainUsername)
-                userArr = this.arrayRemove(userArr, masky)
-                let config = this.getConfig(blockchainName)
-                config.running = false
-                this.setConfig(blockchainName, config)
-                console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
-                return 'Bot has been stopped on user ' + username
-            } else {
-                return 'Bot is not running on user ' + username
-            }
+        return this.displayNameToUser(username).then((blockchainName) => {
+            if(!blockchainName){return 'This user does not exist'}
+           return this.getConfig(blockchainName).then((config: dbUserConfig) => {
+               if(!config){return 'This user is not registered'}
+                const userKey = config.userKey
+                if (key === userKey) {
+                    if(this.isRunning(username)){
+                        const masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
+                        this.killSubscription(masky.streamer.blockchainUsername)
+                        userArr = this.arrayRemove(userArr, masky)
+                        config.running = false
+                        this.setConfig(blockchainName, config)
+                        console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
+                        return 'Bot has been stopped on user ' + username
+                    } else {
+                        return 'Bot is not running on user ' + username
+                    }
 
-        } else {
-            return 'This API key is not valid for user ' + username
-        }
+                } else {
+                    return 'This API key is not valid for user ' + username
+                }
+            })
+        })
     }
 
-    public setConfig(blockchainName: string, config: Object){
-        dataStore.set('users.' + blockchainName, config)
+    public setConfig(blockchainName: string, config: dbUserConfig) {
+        return db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then((query) => {
+                query.docs[0].ref.update({
+                    config: config
+                })
+            })
     }
 
     public killSubscription(id: string){
@@ -156,23 +212,39 @@ export class Master{
 
 
    public startServer(){
-       const app = express();
 
+       const app = express();
+       app.use(cors())
        app.get('/', (req, res) => {
            res.send('Welcome at Masky, please refer to the docs on how to use this API');
        });
 
        app.get('/register', async (req, res) => {
-           res.send(await this.registerBot(req.query.username));
+           this.registerBot(req.query.username, req.query.emailLink).then((result) => {
+               res.send(result);
+           })
+
        });
 
        app.get('/start', async (req, res) => {
-           res.send(await this.startBot(req.query.username, req.query.apikey));
+           this.startBot(req.query.username, req.query.apikey).then((result) => {
+               res.send(result);
+           })
+
        });
 
        app.get('/stop', async (req, res) => {
-           res.send(await this.stopBot(req.query.username, req.query.apikey));
+           this.stopBot(req.query.username, req.query.apikey).then((result) => {
+               res.send(result);
+           })
        });
+
+       app.get('/verificationState', async (req, res) => {
+           this.getVerificationState(req.query.username).then((result) => {
+               res.send(result);
+           })
+       });
+
        const port = process.env.PORT || 8080;
        app.listen(port, () => {
            console.log('Masky listening on port ' + port);

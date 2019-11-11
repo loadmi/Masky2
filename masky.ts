@@ -1,4 +1,4 @@
-import {streamer} from "./types";
+import {dbUserConfig, streamer} from "./types";
 import {EventEmitter} from "events";
 import {API} from './api'
 import {apiEndpoint, apiKey, commandsList} from './globalDefinitions'
@@ -15,10 +15,12 @@ import {
     UnfollowUser
 } from './graphql.json'
 import {connection} from "websocket";
+import {db} from "./master";
 let api: API = null;
 const { createApolloFetch } = require('apollo-fetch');
 const cleverbot = require("cleverbot-free");
 const cleverbotContext: Array<string> = []
+
 
 export class Masky extends EventEmitter  {
     public guessingNumber: number = this.getRandomInt(100)
@@ -30,7 +32,6 @@ export class Masky extends EventEmitter  {
     public announcementInterval: number = 60
     public announcementIteration = 1
     public chatIDs: Array<string> = []
-
     constructor( public streamer: streamer, public con: connection) {
         super()
     }
@@ -57,48 +58,126 @@ export class Masky extends EventEmitter  {
     }
 
     public startListeners() {
-        api.on('ChatText', (chatText) =>{
-            this.chatReceived(chatText)
+        api.on('ChatText', (chatText, conversation) =>{
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatReceived(chatText)
+                this.verify(chatText)
+            }
+
         });
-        api.on('ChatHost', (chatHost) =>{
-            this.gotHosted(chatHost)
+        api.on('ChatHost', (chatHost, conversation) =>{
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotHosted(chatHost)
+            }
         });
-        api.on('ChatGift', (chatGift) => {
-            this.giftReceived(chatGift)
+        api.on('ChatGift', (chatGift, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.giftReceived(chatGift)
+            }
         });
-        api.on('ChatSubscription', (chatSubscription) => {
-            this.gotSubscribed(chatSubscription)
+        api.on('ChatSubscription', (chatSubscription, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotSubscribed(chatSubscription)
+            }
         });
-        api.on('ChatChangeMode', (chatChangeMode) => {
-            this.chatModeChanged(chatChangeMode)
+        api.on('ChatChangeMode', (chatChangeMode, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatModeChanged(chatChangeMode)
+            }
         });
-        api.on('ChatFollow', (chatFollow) => {
-            this.gotFollowed(chatFollow)
+        api.on('ChatFollow', (chatFollow, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotFollowed(chatFollow)
+            }
         });
-        api.on('ChatDelete', (chatDelete) => {
-            this.messageDeleted(chatDelete)
+        api.on('ChatDelete', (chatDelete, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.messageDeleted(chatDelete)
+            }
         });
-        api.on('ChatBan', (chatBan) => {
-            this.userBanned(chatBan)
+        api.on('ChatBan', (chatBan, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.userBanned(chatBan)
+            }
         });
-        api.on('ChatModerator', (chatModerator) => {
-            this.chatModerator(chatModerator)
+        api.on('ChatModerator', (chatModerator, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatModerator(chatModerator)
+            }
         });
-        api.on('ChatEmoteAdd', (chatEmoteAdd) => {
-            this.emoteAdded(chatEmoteAdd)
+        api.on('ChatEmoteAdd', (chatEmoteAdd, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.emoteAdded(chatEmoteAdd)
+            }
+        })
+
+    }
+
+    public isVerified(){
+        return this.getConfig(this.streamer.blockchainUsername).then((config) => {
+            return config.verified
+        })
+    }
+
+    public verify(chatText: any){
+        this.isVerified().then((isVerified) => {
+                        if(!isVerified) {
+                            if (chatText.content.startsWith('!verify')) {
+                                if (chatText.roomRole === 'Owner' || chatText.sender.displayname === 'Loadmi') {
+                                    this.getConfig(this.streamer.blockchainUsername).then((config) => {
+                                        config.verified = true
+                                        this.isAlive = true
+                                        this.setConfig(this.streamer.blockchainUsername, config).then((result) => {
+                                            console.log('verified user ' + this.streamer.blockchainUsername)
+                                            this.sendChat('Successfully verified chanel! You can use Masky now.')
+                                        })
+                                    })
+                                } else {
+                                    this.sendChat('Only the channel owner can verify a channel. You are not channel Admin')
+                                }
+                }
+            }
         })
 
     }
 
 
-
-
     public connect() {
-        api  = new API(this.streamer, this.con);
+      this.isVerified().then((isVerified: any) => {
+          if(!isVerified){
+              this.isAlive = isVerified
+              this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!')
+              console.log('Setting isAlive to false on ' + this.streamer.blockchainUsername + ' because the acount is not verified')
+          }
+
+
+      })
+        api = new API(this.streamer, this.con);
         api.init();
         this.startListeners()
     }
+    public getConfig(blockchainName: string): Promise<any> {
+        return db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then((query) => {
+                if (query.size !== 1){
+                    return false
+                } else {
+                    return query.docs[0].data().config
 
+                }
+            })
+    }
+
+    public setConfig(blockchainName: string, config: dbUserConfig) {
+        return db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then((query) => {
+                query.docs[0].ref.update({
+                    config: config
+                })
+            })
+    }
 
     public async chatReceived(chatText: any) {
         const message: string = chatText.content;
@@ -144,7 +223,7 @@ export class Masky extends EventEmitter  {
                     this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice())
                     break;
                 case message.startsWith('!guess'):
-                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(argument))
+                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(+argument))
                     break;
                 case message.startsWith('!lino'):
                     if (argument) {
@@ -256,7 +335,7 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!setinterval'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementInterval = argument
+                        this.announcementInterval = +argument
                         this.sendChat('I have set the announcement interval to every ' + argument + ' seconds')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
@@ -264,7 +343,7 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!setduration'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementDuration = argument
+                        this.announcementDuration = +argument
                         this.sendChat('I have set the announcement duration to ' + argument + ' times')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
