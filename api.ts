@@ -29,6 +29,7 @@ export class API extends EventEmitter {
         }))
         console.log('connected user ' + this.streamer.blockchainUsername)
     this.con.on('message', (message: any)=>{
+        console.log(message)
                 if (message && message.type === "utf8") {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {

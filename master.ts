@@ -120,25 +120,25 @@ export class Master{
     }
     public async startBot(username: string, key: string) {
         return this.displayNameToUser(username).then((blockchainName) => {
-            if(!blockchainName){return 'This user does not exist'}
+            if(!blockchainName){return {success: false, message: 'This user does not exist'}}
             return this.getConfig(blockchainName).then((config: dbUserConfig) => {
-                if(!config){return 'This user is not registered'}
+                if(!config){return {success: false, message: 'This user is not registered'}}
                 const userKey = config.userKey
                 if(key === userKey){
                     if(this.isRunning(username)){
-                        return 'Bot is already running on user ' + username
+                        return {success: false, message: 'Bot is already running on user' + username}
                     } else {
                         const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con)
                         userArr.push(masky)
                         masky.connect()
                         config.running = true
                         this.setConfig(blockchainName, config)
-                        return 'Bot has been started on user ' + username
+                        return {success: true}
                     }
 
 
                 } else {
-                    return 'This API key is not valid for user ' + username
+                    return {success: false, message: 'This API key is not valid for user ' + username}
                 }
             })
 
@@ -159,10 +159,10 @@ export class Master{
 
     }
     public async stopBot(username: string, key: string) {
-        return this.displayNameToUser(username).then((blockchainName) => {
-            if(!blockchainName){return 'This user does not exist'}
+        return this.displayNameToUser(username).then((blockchainName): any => {
+            if(!blockchainName){return {success: false, message: 'This user does not exist'}}
            return this.getConfig(blockchainName).then((config: dbUserConfig) => {
-               if(!config){return 'This user is not registered'}
+               if(!config){return {success: false, message: 'This user is not registered'}}
                 const userKey = config.userKey
                 if (key === userKey) {
                     if(this.isRunning(username)){
@@ -172,13 +172,13 @@ export class Master{
                         config.running = false
                         this.setConfig(blockchainName, config)
                         console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
-                        return 'Bot has been stopped on user ' + username
+                        return {success: true}
                     } else {
-                        return 'Bot is not running on user ' + username
+                        return {success: false, message: 'Bot is not running on user ' + username}
                     }
 
                 } else {
-                    return 'This API key is not valid for user ' + username
+                    return {success: false, message: 'This API key is not valid for user ' + username}
                 }
             })
         })
