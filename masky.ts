@@ -57,35 +57,57 @@ export class Masky extends EventEmitter  {
     }
 
     public startListeners() {
-        api.on('ChatText', (chatText) =>{
-            this.chatReceived(chatText)
+        api.on('ChatText', (chatText, conversation) =>{
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatReceived(chatText)
+                this.verify(chatText)
+            }
+
         });
-        api.on('ChatHost', (chatHost) =>{
-            this.gotHosted(chatHost)
+        api.on('ChatHost', (chatHost, conversation) =>{
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotHosted(chatHost)
+            }
         });
-        api.on('ChatGift', (chatGift) => {
-            this.giftReceived(chatGift)
+        api.on('ChatGift', (chatGift, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.giftReceived(chatGift)
+            }
         });
-        api.on('ChatSubscription', (chatSubscription) => {
-            this.gotSubscribed(chatSubscription)
+        api.on('ChatSubscription', (chatSubscription, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotSubscribed(chatSubscription)
+            }
         });
-        api.on('ChatChangeMode', (chatChangeMode) => {
-            this.chatModeChanged(chatChangeMode)
+        api.on('ChatChangeMode', (chatChangeMode, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatModeChanged(chatChangeMode)
+            }
         });
-        api.on('ChatFollow', (chatFollow) => {
-            this.gotFollowed(chatFollow)
+        api.on('ChatFollow', (chatFollow, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.gotFollowed(chatFollow)
+            }
         });
-        api.on('ChatDelete', (chatDelete) => {
-            this.messageDeleted(chatDelete)
+        api.on('ChatDelete', (chatDelete, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.messageDeleted(chatDelete)
+            }
         });
-        api.on('ChatBan', (chatBan) => {
-            this.userBanned(chatBan)
+        api.on('ChatBan', (chatBan, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.userBanned(chatBan)
+            }
         });
-        api.on('ChatModerator', (chatModerator) => {
-            this.chatModerator(chatModerator)
+        api.on('ChatModerator', (chatModerator, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.chatModerator(chatModerator)
+            }
         });
-        api.on('ChatEmoteAdd', (chatEmoteAdd) => {
-            this.emoteAdded(chatEmoteAdd)
+        api.on('ChatEmoteAdd', (chatEmoteAdd, conversation) => {
+            if(conversation === this.streamer.blockchainUsername){
+                this.emoteAdded(chatEmoteAdd)
+            }
         })
 
     }
@@ -144,7 +166,7 @@ export class Masky extends EventEmitter  {
                     this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice())
                     break;
                 case message.startsWith('!guess'):
-                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(argument))
+                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(+argument))
                     break;
                 case message.startsWith('!lino'):
                     if (argument) {
@@ -256,7 +278,7 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!setinterval'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementInterval = argument
+                        this.announcementInterval = +argument
                         this.sendChat('I have set the announcement interval to every ' + argument + ' seconds')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
@@ -264,7 +286,7 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!setduration'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementDuration = argument
+                        this.announcementDuration = +argument
                         this.sendChat('I have set the announcement duration to ' + argument + ' times')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
