@@ -86,7 +86,7 @@ var API = /** @class */ (function (_super) {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {
                     var remMessage = message.payload.data.streamMessageReceived["0"];
-                    _this.emit(remMessage.__typename, remMessage);
+                    _this.emit(remMessage.__typename, remMessage, message.id);
                 }
             }
         });

@@ -41,22 +41,40 @@ var globalDefinitions_1 = require("./globalDefinitions");
 var apollo_fetch_1 = require("apollo-fetch");
 var graphql_json_1 = require("./graphql.json");
 var websocket_1 = require("websocket");
+var admin = require('firebase-admin');
+var serviceAccount = require('./maskybot-7a359f2d7e57.json');
 var socket = new websocket_1.client;
 var express = require('express');
-var dataStore = require('data-store')({ path: process.cwd() + '/store.json' });
-//const dataStore = require('data-store')({ path: 'gs://maskybot.appspot.com/store.json' });
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+var cors = require('cors');
+exports.db = admin.firestore();
 var userArr = [];
 var con = null;
 var Master = /** @class */ (function () {
     function Master() {
     }
-    Master.prototype.newDataStoreUser = function (blockchainName, userKey) {
-        dataStore.union('users', {
-            blockchainName: blockchainName,
-            config: {
-                userKey: userKey,
-                running: true
-            }
+    Master.prototype.newDbUser = function (blockchainName, userKey) {
+        return __awaiter(this, void 0, void 0, function () {
+            var userRef, userData;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, exports.db.collection('users').doc()];
+                    case 1:
+                        userRef = _a.sent();
+                        userData = {
+                            blockchainName: blockchainName,
+                            config: {
+                                userKey: userKey,
+                                running: true,
+                                verified: false
+                            }
+                        };
+                        userRef.set(userData);
+                        return [2 /*return*/];
+                }
+            });
         });
     };
     Master.prototype.connectAPI = function () {
@@ -85,26 +103,31 @@ var Master = /** @class */ (function () {
         });
     };
     Master.prototype.loadUsers = function () {
-        var _this = this;
-        dataStore.get('users').forEach(function (user) { return __awaiter(_this, void 0, void 0, function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var _this = this;
             return __generator(this, function (_a) {
-                if (user.config.running) {
-                    this.fetchQuery(graphql_json_1.GetUserInfo, {
-                        username: user.blockchainName
-                    }).then(function (me) {
-                        var masky = new masky_1.Masky({
-                            blockchainUsername: user.blockchainName,
-                            displayname: me.data.user.displayname
-                        }, con);
-                        userArr.push(masky);
-                        // TODO: Initial connect doesn't work
-                        masky.connect();
+                exports.db.collection('users').get().then(function (usersSnapshot) {
+                    usersSnapshot.docs.forEach(function (userDoc) {
+                        var user = userDoc.data();
+                        if (user.config.running) {
+                            _this.fetchQuery(graphql_json_1.GetUserInfo, {
+                                username: user.blockchainName
+                            }).then(function (me) {
+                                var masky = new masky_1.Masky({
+                                    blockchainUsername: user.blockchainName,
+                                    displayname: me.data.user.displayname
+                                }, con);
+                                userArr.push(masky);
+                                // TODO: Initial connect doesn't work
+                                masky.connect();
+                            });
+                        }
                     });
-                }
+                    console.log('loaded users');
+                });
                 return [2 /*return*/];
             });
-        }); });
-        console.log('loaded users');
+        });
     };
     Master.prototype.start = function () {
         return __awaiter(this, void 0, void 0, function () {
@@ -116,12 +139,21 @@ var Master = /** @class */ (function () {
         });
     };
     Master.prototype.getConfig = function (blockchainName) {
-        return dataStore.get('users').find(function (x) { return x.blockchainName == blockchainName; }) ?
-            dataStore.get('users').find(function (x) { return x.blockchainName == blockchainName; }).config : false;
+        return exports.db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then(function (query) {
+            if (query.size !== 1) {
+                return false;
+            }
+            else {
+                return query.docs[0].data().config;
+            }
+        });
     };
     Master.prototype.registerBot = function (username) {
         return __awaiter(this, void 0, void 0, function () {
-            var userKey, blockchainName, masky;
+            var userKey, blockchainName;
+            var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -133,16 +165,18 @@ var Master = /** @class */ (function () {
                             return [2 /*return*/, 'This dlive user does not exist!'];
                         }
                         else {
-                            if (!this.getConfig(blockchainName)) {
-                                this.newDataStoreUser(blockchainName, userKey);
-                                masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
-                                userArr.push(masky);
-                                masky.connect();
-                                return [2 /*return*/, "\n        Successfully registered Masky for user " + username + "<br>\n        Your API Key is : " + userKey + "<br>\n        current Status: Running\n        "];
-                            }
-                            else {
-                                return [2 /*return*/, 'User ' + username + ' is already registered!'];
-                            }
+                            return [2 /*return*/, this.getConfig(blockchainName).then(function (config) {
+                                    if (!config) {
+                                        _this.newDbUser(blockchainName, userKey);
+                                        var masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
+                                        userArr.push(masky);
+                                        masky.connect();
+                                        return "\n        Successfully registered Masky for user " + username + "<br>\n        Your API Key is : " + userKey + "<br>\n        current Status: Running\n        ";
+                                    }
+                                    else {
+                                        return 'User ' + username + ' is already registered!';
+                                    }
+                                })];
                         }
                         return [2 /*return*/];
                 }
@@ -151,66 +185,81 @@ var Master = /** @class */ (function () {
     };
     Master.prototype.startBot = function (username, key) {
         return __awaiter(this, void 0, void 0, function () {
-            var blockchainName, userKey, masky, config;
+            var _this = this;
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.displayNameToUser(username)];
-                    case 1:
-                        blockchainName = _a.sent();
-                        userKey = this.getConfig(blockchainName).userKey;
-                        if (key === userKey) {
-                            if (this.isRunning(username)) {
-                                return [2 /*return*/, 'Bot is already running on user ' + username];
+                return [2 /*return*/, this.displayNameToUser(username).then(function (blockchainName) {
+                        if (!blockchainName) {
+                            return 'This user does not exist';
+                        }
+                        return _this.getConfig(blockchainName).then(function (config) {
+                            if (!config) {
+                                return 'This user is not registered';
+                            }
+                            var userKey = config.userKey;
+                            if (key === userKey) {
+                                if (_this.isRunning(username)) {
+                                    return 'Bot is already running on user ' + username;
+                                }
+                                else {
+                                    var masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
+                                    userArr.push(masky);
+                                    masky.connect();
+                                    config.running = true;
+                                    _this.setConfig(blockchainName, config);
+                                    return 'Bot has been started on user ' + username;
+                                }
                             }
                             else {
-                                masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
-                                userArr.push(masky);
-                                masky.connect();
-                                config = this.getConfig(blockchainName);
-                                config.running = true;
-                                this.setConfig(blockchainName, config);
-                                return [2 /*return*/, 'Bot has been started on user ' + username];
+                                return 'This API key is not valid for user ' + username;
                             }
-                        }
-                        else {
-                            return [2 /*return*/, 'This API key is not valid for user ' + username];
-                        }
-                        return [2 /*return*/];
-                }
+                        });
+                    })];
             });
         });
     };
     Master.prototype.stopBot = function (username, key) {
         return __awaiter(this, void 0, void 0, function () {
-            var blockchainName, userKey, masky, config;
+            var _this = this;
             return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.displayNameToUser(username)];
-                    case 1:
-                        blockchainName = _a.sent();
-                        userKey = this.getConfig(blockchainName).userKey;
-                        if (!(key === userKey)) return [3 /*break*/, 5];
-                        if (!this.isRunning(username)) return [3 /*break*/, 3];
-                        masky = userArr.find(function (x) { return x.streamer.displayname.toLowerCase() === username.toLowerCase(); });
-                        return [4 /*yield*/, this.killSubscription(masky.streamer.blockchainUsername)];
-                    case 2:
-                        _a.sent();
-                        userArr = this.arrayRemove(userArr, masky);
-                        config = this.getConfig(blockchainName);
-                        config.running = false;
-                        this.setConfig(blockchainName, config);
-                        console.log('Instance ' + masky.streamer.blockchainUsername + ' has died');
-                        return [2 /*return*/, 'Bot has been stopped on user ' + username];
-                    case 3: return [2 /*return*/, 'Bot is not running on user ' + username];
-                    case 4: return [3 /*break*/, 6];
-                    case 5: return [2 /*return*/, 'This API key is not valid for user ' + username];
-                    case 6: return [2 /*return*/];
-                }
+                return [2 /*return*/, this.displayNameToUser(username).then(function (blockchainName) {
+                        if (!blockchainName) {
+                            return 'This user does not exist';
+                        }
+                        return _this.getConfig(blockchainName).then(function (config) {
+                            if (!config) {
+                                return 'This user is not registered';
+                            }
+                            var userKey = config.userKey;
+                            if (key === userKey) {
+                                if (_this.isRunning(username)) {
+                                    var masky = userArr.find(function (x) { return x.streamer.displayname.toLowerCase() === username.toLowerCase(); });
+                                    _this.killSubscription(masky.streamer.blockchainUsername);
+                                    userArr = _this.arrayRemove(userArr, masky);
+                                    config.running = false;
+                                    _this.setConfig(blockchainName, config);
+                                    console.log('Instance ' + masky.streamer.blockchainUsername + ' has died');
+                                    return 'Bot has been stopped on user ' + username;
+                                }
+                                else {
+                                    return 'Bot is not running on user ' + username;
+                                }
+                            }
+                            else {
+                                return 'This API key is not valid for user ' + username;
+                            }
+                        });
+                    })];
             });
         });
     };
     Master.prototype.setConfig = function (blockchainName, config) {
-        dataStore.set('users.' + blockchainName, config);
+        return exports.db.collection('users')
+            .where('blockchainName', '==', blockchainName)
+            .get().then(function (query) {
+            query.docs[0].ref.update({
+                config: config
+            });
+        });
     };
     Master.prototype.killSubscription = function (id) {
         con.sendUTF(JSON.stringify({
@@ -229,46 +278,32 @@ var Master = /** @class */ (function () {
     Master.prototype.startServer = function () {
         var _this = this;
         var app = express();
+        app.use(cors());
         app.get('/', function (req, res) {
             res.send('Welcome at Masky, please refer to the docs on how to use this API');
         });
         app.get('/register', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
-            var _a, _b;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
-                    case 0:
-                        _b = (_a = res).send;
-                        return [4 /*yield*/, this.registerBot(req.query.username)];
-                    case 1:
-                        _b.apply(_a, [_c.sent()]);
-                        return [2 /*return*/];
-                }
+            return __generator(this, function (_a) {
+                this.registerBot(req.query.username).then(function (result) {
+                    res.send(result);
+                });
+                return [2 /*return*/];
             });
         }); });
         app.get('/start', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
-            var _a, _b;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
-                    case 0:
-                        _b = (_a = res).send;
-                        return [4 /*yield*/, this.startBot(req.query.username, req.query.apikey)];
-                    case 1:
-                        _b.apply(_a, [_c.sent()]);
-                        return [2 /*return*/];
-                }
+            return __generator(this, function (_a) {
+                this.startBot(req.query.username, req.query.apikey).then(function (result) {
+                    res.send(result);
+                });
+                return [2 /*return*/];
             });
         }); });
         app.get('/stop', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
-            var _a, _b;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
-                    case 0:
-                        _b = (_a = res).send;
-                        return [4 /*yield*/, this.stopBot(req.query.username, req.query.apikey)];
-                    case 1:
-                        _b.apply(_a, [_c.sent()]);
-                        return [2 /*return*/];
-                }
+            return __generator(this, function (_a) {
+                this.stopBot(req.query.username, req.query.apikey).then(function (result) {
+                    res.send(result);
+                });
+                return [2 /*return*/];
             });
         }); });
         var port = process.env.PORT || 8080;

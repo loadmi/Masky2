@@ -29,11 +29,11 @@ export class API extends EventEmitter {
         }))
         console.log('connected user ' + this.streamer.blockchainUsername)
     this.con.on('message', (message: any)=>{
-            if (message && message.type === "utf8") {
+                if (message && message.type === "utf8") {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {
                     const remMessage = message.payload.data.streamMessageReceived["0"];
-                    this.emit(remMessage.__typename, remMessage)
+                    this.emit(remMessage.__typename, remMessage, message.id)
                 }
             }
         })
