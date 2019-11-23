@@ -66,6 +66,9 @@ var API = /** @class */ (function (_super) {
             });
         });
     };
+    API.prototype.kill = function () {
+        //this.listener.removeAllListeners()
+    };
     API.prototype.subscribe = function () {
         var _this = this;
         this.con.sendUTF(JSON.stringify({
@@ -81,7 +84,7 @@ var API = /** @class */ (function (_super) {
             }
         }));
         console.log('connected user ' + this.streamer.blockchainUsername);
-        this.con.on('message', function (message) {
+        this.listener = this.con.on('message', function (message) {
             if (message && message.type === "utf8") {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {

@@ -1,4 +1,4 @@
-import {dbUserConfig, streamer} from "./types";
+import {dbUserConfig, streamer, userSettings} from "./types";
 import {EventEmitter} from "events";
 import {API} from './api'
 import {apiEndpoint, apiKey, commandsList} from './globalDefinitions'
@@ -12,10 +12,12 @@ import {
     SendStreamChatMessage,
     StreamChatBannedUsers,
     UnbanStreamChatUser,
-    UnfollowUser
+    UnfollowUser,
 } from './graphql.json'
 import {connection} from "websocket";
 import {db} from "./master";
+const LanguageDetect = require('languagedetect');
+const language = new LanguageDetect();
 let api: API = null;
 const { createApolloFetch } = require('apollo-fetch');
 const cleverbot = require("cleverbot-free");
@@ -32,6 +34,7 @@ export class Masky extends EventEmitter  {
     public announcementInterval: number = 60
     public announcementIteration = 1
     public chatIDs: Array<string> = []
+    public localConfig: userSettings = null
     constructor( public streamer: streamer, public con: connection) {
         super()
     }
@@ -113,10 +116,20 @@ export class Masky extends EventEmitter  {
 
     }
 
+
     public isVerified(){
         return this.getConfig(this.streamer.blockchainUsername).then((config) => {
             return config.verified
         })
+    }
+
+    public async reloadConfig() {
+       return this.getConfig(this.streamer.blockchainUsername).then((config) => {
+            this.localConfig = config
+           console.log('config has been reloaded on ' + this.streamer.blockchainUsername)
+           return {success: true, message: 'config has been reloaded on ' + this.streamer.blockchainUsername}
+        })
+
     }
 
     public verify(chatText: any){
@@ -141,22 +154,33 @@ export class Masky extends EventEmitter  {
 
     }
 
+public kill(){
+        this.isAlive = false
+    try {
+        api.kill()
+        api = null
+    }  catch {
 
-    public connect() {
-      this.isVerified().then((isVerified: any) => {
-          if(!isVerified){
-              this.isAlive = isVerified
-              this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!')
-              console.log('Setting isAlive to false on ' + this.streamer.blockchainUsername + ' because the acount is not verified')
-          }
+    }
+
+}
+
+    public async connect() {
+        this.isVerified().then((isVerified: any) => {
+            if (!isVerified) {
+                this.isAlive = isVerified
+                this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!')
+                console.log('Setting isAlive to false on ' + this.streamer.blockchainUsername + ' because the acount is not verified')
+            }
 
 
-      })
+        })
         api = new API(this.streamer, this.con);
         api.init();
         this.startListeners()
+        this.reloadConfig()
     }
-    public getConfig(blockchainName: string): Promise<any> {
+    public getConfig(blockchainName: string): Promise<userSettings> {
         return db.collection('users')
             .where('blockchainName', '==', blockchainName)
             .get().then((query) => {
@@ -169,7 +193,7 @@ export class Masky extends EventEmitter  {
             })
     }
 
-    public setConfig(blockchainName: string, config: dbUserConfig) {
+    public setConfig(blockchainName: string, config: userSettings) {
         return db.collection('users')
             .where('blockchainName', '==', blockchainName)
             .get().then((query) => {
@@ -177,6 +201,10 @@ export class Masky extends EventEmitter  {
                     config: config
                 })
             })
+    }
+
+    public syncConfig(){
+        this.setConfig(this.streamer.blockchainUsername, this.localConfig)
     }
 
     public async chatReceived(chatText: any) {
@@ -197,7 +225,10 @@ export class Masky extends EventEmitter  {
         if(this.isAlive === true) {
 
             switch (true) {
-
+                case message.startsWith('!config'):
+                    this.sendChat('config has been logged to console')
+                    console.log(this.localConfig)
+                    break;
                 case message.startsWith('!help'):
                     this.sendChat('Available commands can be found here: ' + commandsList);
                     break;
@@ -208,40 +239,70 @@ export class Masky extends EventEmitter  {
                     this.sendChat('Hey guys i\'m Masky, loadmi\'s little cyberfriend :) Try !help to see what i can do');
                     break;
                 case message.startsWith('!chuck'):
-                    this.sendChat(await this.getChuck());
+                    if(this.localConfig.chuck.enabled){
+                        this.sendChat(await this.getChuck())
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
+
                     break;
                 case message.startsWith('!advice'):
-                    this.sendChat(await this.getAdvice());
+                    if(this.localConfig.advice.enabled){
+                        this.sendChat(await this.getAdvice());
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
                     break;
                 case message.startsWith('!decide'):
-                    this.sendChat('@' + senderDisplayName + ' ' + await this.getDecision());
+                    if(this.localConfig.decide.enabled){
+                        this.sendChat('@' + senderDisplayName + ' ' + await this.getDecision());
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
                     break;
                 case message.startsWith('!ud'):
-                    this.sendChat(await this.getDefinition(argument));
+                    if(this.localConfig.ud.enabled){
+                        this.sendChat(await this.getDefinition(argument));
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
                     break;
                 case message.startsWith('!dice'):
-                    this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice())
+                    if(this.localConfig.dice.enabled){
+                        this.sendChat('@' + senderDisplayName + ' you have rolled a ' + this.getDice())
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
                     break;
                 case message.startsWith('!guess'):
-                    this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(+argument))
+                    if(this.localConfig.guess.enabled){
+                        this.sendChat('@' + senderDisplayName + ' ' + this.checkGuess(+argument))
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
+                    }
                     break;
                 case message.startsWith('!lino'):
-                    if (argument) {
-                        const blockchainName = await this.displayNameToUser(argument)
-                        if (blockchainName) {
-                            this.getUserData(blockchainName).then((data) => {
-                                const balance = Math.round(data.user.wallet.balance / 100000)
-                                this.sendChat('@' + senderDisplayName + ' The user ' + argument + ' currently has ' + balance + ' linos')
-                            })
+                    if(this.localConfig.lino.enabled){
+                        if (argument) {
+                            const blockchainName = await this.displayNameToUser(argument)
+                            if (blockchainName) {
+                                this.getUserData(blockchainName).then((data) => {
+                                    const balance = Math.round(data.user.wallet.balance / 100000)
+                                    this.sendChat('@' + senderDisplayName + ' The user ' + argument + ' currently has ' + balance + ' linos')
+                                })
+                            } else {
+                                this.sendChat('@' + senderDisplayName + ' this user does not exist')
+                            }
                         } else {
                             this.sendChat('@' + senderDisplayName + ' this user does not exist')
                         }
                     } else {
-                        this.sendChat('@' + senderDisplayName + ' this user does not exist')
+                        this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
                     }
+
                     break;
                 case message.startsWith('!showadmins'):
-                    this.sendChat('@' + senderDisplayName + ' Current admins: ' + this.Admins.toString())
+                    this.sendChat('@' + senderDisplayName + ' Current admins: ' + this.localConfig.admins.toString())
                     break;
                 case message.startsWith('!enter'):
                     if (this.giveawayRunning === true) {
@@ -255,14 +316,25 @@ export class Masky extends EventEmitter  {
                         this.sendChat('@' + senderDisplayName + ' There is no giveaway active currently')
                     }
                     break;
+                case message.startsWith('!blockedlanguages'):
+                    this.sendChat(this.getBlockedLanguages())
+                    break;
+                case message.startsWith('!warn'):
+                    if(chatText.roomRole === 'Moderator' || chatText.roomRole === 'Owner'){
+                        this.warnUser(argument, 1, '')
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' Only Moderators and room Owners can warn users!')
+                    }
+                    break;
                 case message.startsWith('NEWNONADMINCOMMANDS'):
                     break;
                 case message.startsWith('!addadmin'):
                     if (this.isAdmin(senderDisplayName)) {
-                        if (this.Admins.indexOf(argument) > -1) {
+                        if (this.localConfig.admins.indexOf(argument) > -1) {
                             this.sendChat(argument + ' Is already an admin')
                         } else {
-                            this.Admins.push(argument)
+                            this.localConfig.admins.push(argument)
+                            this.syncConfig()
                             this.sendChat(argument + ' has been added to the admin list!')
                         }
                     } else {
@@ -271,12 +343,13 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!removeadmin'):
                     if (this.isAdmin(senderDisplayName)) {
-                        if (this.Admins.indexOf(argument) > -1) {
-                            for (let i = this.Admins.length - 1; i >= 0; i--) {
-                                if (this.Admins[i] === argument) {
-                                    this.Admins.splice(i, 1);
+                        if (this.localConfig.admins.indexOf(argument) > -1) {
+                            for (let i = this.localConfig.admins.length - 1; i >= 0; i--) {
+                                if (this.localConfig.admins[i] === argument) {
+                                    this.localConfig.admins.splice(i, 1);
                                 }
                             }
+                            this.syncConfig()
                             this.sendChat(argument + ' has been removed from the admin list')
                         } else {
                             this.sendChat(argument + ' Is not an admin')
@@ -351,18 +424,61 @@ export class Masky extends EventEmitter  {
                     break;
                 case message.startsWith('!announce'):
                     if (this.isAdmin(senderDisplayName)) {
-                        console.log(argument)
                         this.doAnnouncement(argument)
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
                     }
+                case message.startsWith('!blocklanguage'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.isMod().then((isMod) => {
+                            if(isMod){
+                                this.blockLanguage(argument)
+                            }else{
+                                this.sendChat('To use this feature you need to make me moderator and try again.')
+                            }
+                        })
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!unblocklanguage'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.unblockLanguage(argument)
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!enable'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.enableCommand(argument)
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                case message.startsWith('!disable'):
+                    if (this.isAdmin(senderDisplayName)) {
+                        this.disableCommand(argument)
+                    } else {
+                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                    }
+                    break;
+                default:
+                    this.languageCheck(chatText)
+                    break;
             }
             if(message.startsWith('@Masky_bot')){
-                cleverbot(message, cleverbotContext).then(response => {
-                    cleverbotContext.push(message)
-                    cleverbotContext.push(response)
-                    this.sendChat('@' + senderDisplayName + ' ' + response)
-                });
+                const trimmedMessage = message.replace('@Masky_bot ', '')
+                console.log(trimmedMessage)
+                if(this.localConfig.naturalConversation.enabled){
+                    cleverbot(trimmedMessage, cleverbotContext).then(response => {
+                        cleverbotContext.push(trimmedMessage)
+                        cleverbotContext.push(response)
+                        this.sendChat('@' + senderDisplayName + ' ' + response)
+                    });
+                } else {
+                    this.sendChat('@' + senderDisplayName + ' Natural conversation with me is not enabled! If you want to use it please ask the streamer to enable it.')
+                }
+
 
             }
         } else {
@@ -375,6 +491,264 @@ export class Masky extends EventEmitter  {
                 }
             }
         }
+    }
+
+    private getBlockedLanguages(){
+        const blockedArr = []
+        if(this.localConfig.languageEnforcement.filterLanguages.turkish){blockedArr.push('Turkish')}
+        if(this.localConfig.languageEnforcement.filterLanguages.english){blockedArr.push('English')}
+        if(this.localConfig.languageEnforcement.filterLanguages.german){blockedArr.push('German')}
+        if(blockedArr.length === 0){blockedArr.push('none')}
+        return 'Blocked languages: ' + blockedArr
+    }
+
+    private warnUser(displayName: string, severity: number, text: string){
+        const entry = this.localConfig.warningSystem.users.filter(obj => (obj.displayName === displayName))
+        if(entry.length === 0){
+            this.localConfig.warningSystem.users.push({
+                displayName,
+                warnings: [{
+                    severity,
+                    text
+                }]
+            })
+        } else {
+            entry[0].warnings.push({
+                    severity,
+                    text
+            })
+        }
+        console.log(this.localConfig.warningSystem.users)
+        this.processWarnings()
+    }
+
+    private processWarnings(){
+        this.localConfig.warningSystem.users.forEach((user) => {
+            let warnings = 0
+            user.warnings.forEach((warning) => {
+                warnings += warning.severity
+            })
+            const tier = warnings / this.localConfig.warningSystem.warningsPerTier
+            switch(tier){
+                case 1:
+                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier1.tierPenaltyType, this.localConfig.warningSystem.tiers.tier1.tierPenaltyDuration)
+                    break;
+                case 2:
+                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier2.tierPenaltyType, this.localConfig.warningSystem.tiers.tier2.tierPenaltyDuration)
+                    break;
+                case 3:
+                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier3.tierPenaltyType, this.localConfig.warningSystem.tiers.tier3.tierPenaltyDuration)
+                    break;
+            }
+        })
+    }
+
+    private punishUser(displayName: string, type: string, amount: number) {
+        console.log('punishing @' + displayName)
+        console.log(type)
+        if(type === 'temp_mute'){
+            console.log('sendchat')
+            this.sendChat('temp_mute @' + displayName)
+        } else if(type === 'mute'){
+            this.displayNameToUser(displayName).then((blockchainName) => {
+                this.banUser(blockchainName)
+            })
+        }
+    }
+
+    private getWanings(){
+
+    }
+    private enableCommand(command: string){
+        switch(command){
+            case 'thankforgifts':
+                this.localConfig.thankForGifts.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'thankforhosts':
+                this.localConfig.thankForHost.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'thankforsubscriptions':
+                this.localConfig.thankForSubscription.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'thankforfollows':
+                this.localConfig.thankForFollow.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'chuck':
+                this.localConfig.chuck.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'advice':
+                this.localConfig.advice.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'decide':
+                this.localConfig.decide.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'ud':
+                this.localConfig.ud.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'dice':
+                this.localConfig.dice.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'guess':
+                this.localConfig.guess.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'lino':
+                this.localConfig.lino.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            case 'naturalconversation':
+                this.localConfig.naturalConversation.enabled = true
+                this.sendChat(command + ' has been enabled')
+                break;
+            default:
+                this.sendChat('the command ' + command + ' does not exist!')
+                break;
+        }
+        this.syncConfig()
+    }
+
+    private disableCommand(command: string){
+        switch(command){
+            case 'thankforgifts':
+                this.localConfig.thankForGifts.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'thankforhosts':
+                this.localConfig.thankForHost.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'thankforsubscriptions':
+                this.localConfig.thankForSubscription.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'thankforfollows':
+                this.localConfig.thankForFollow.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'chuck':
+                this.localConfig.chuck.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'advice':
+                this.localConfig.advice.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'decide':
+                this.localConfig.decide.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'ud':
+                this.localConfig.ud.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'dice':
+                this.localConfig.dice.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'guess':
+                this.localConfig.guess.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'lino':
+                this.localConfig.lino.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            case 'naturalconversation':
+                this.localConfig.naturalConversation.enabled = false
+                this.sendChat(command + ' has been disabled')
+                break;
+            default:
+                this.sendChat('the command ' + command + ' does not exist!')
+                break;
+        }
+        this.syncConfig()
+    }
+
+    private isMod(){
+       return this.sendChat('::IGNORE::masky_mod_status::IGNORE::').then((data)=> {
+           this.deleteChat(data.data.sendStreamchatMessage.message.id)
+           return data.data.sendStreamchatMessage.message.roomRole === 'Moderator'
+       })
+
+    }
+
+    private languageCheck(chatText: any){
+        const detectedLanguages = language.detect(chatText.content).slice(0,3)
+        if(chatText.sender.displayname !== 'Masky_bot'){
+            detectedLanguages.forEach((item) => {
+                if(item.includes('english')){
+                    if(this.localConfig.languageEnforcement.filterLanguages.english){
+                        this.deleteChat(chatText.id).then((result) => {
+                            this.sendChat('@' + chatText.sender.displayname +' English is not allowed in this chanel!')
+                        })
+                    }
+                }
+
+                if(item.includes('turkish')){
+                    if(this.localConfig.languageEnforcement.filterLanguages.turkish){
+                        this.deleteChat(chatText.id).then((result) => {
+                            console.log(result)
+                            console.log(chatText)
+                            this.sendChat('@' + chatText.sender.displayname +' Turkish is not allowed in this chanel!')
+                        })
+                }
+            }
+
+            if(item.includes('german')){
+                if(this.localConfig.languageEnforcement.filterLanguages.german){
+                    this.deleteChat(chatText.id).then((result) => {
+                        this.sendChat('@' + chatText.sender.displayname +' German is not allowed in this chanel!')
+                    })
+                }
+            }
+        })
+        }
+    }
+    public unblockLanguage(language: string){
+        switch(language.toLowerCase()){
+            case 'turkish':
+                this.localConfig.languageEnforcement.filterLanguages.turkish = false
+                this.sendChat('Turkish has been removed from the blocked languages')
+                break;
+            case 'english':
+                this.localConfig.languageEnforcement.filterLanguages.english = false
+                this.sendChat('English has been removed from the blocked languages')
+                break;
+            case 'german':
+                this.localConfig.languageEnforcement.filterLanguages.german = false
+                this.sendChat('German has been removed from the blocked languages')
+                break;
+        }
+        this.syncConfig()
+    }
+    public blockLanguage(language: string){
+        switch(language.toLowerCase()){
+            case 'turkish':
+                this.localConfig.languageEnforcement.filterLanguages.turkish = true
+                this.sendChat('Turkish has been added to the blocked languages')
+                break;
+            case 'english':
+                this.localConfig.languageEnforcement.filterLanguages.english = true
+                this.sendChat('English has been added to the blocked languages')
+                break;
+            case 'german':
+                this.localConfig.languageEnforcement.filterLanguages.german = true
+                this.sendChat('German has been added to the blocked languages')
+                break;
+            default:
+                this.sendChat(language + ' cannot be blocked currently')
+                break;
+        }
+        this.syncConfig()
     }
 
     public doAnnouncement(message) {
@@ -394,7 +768,7 @@ export class Masky extends EventEmitter  {
 
     public isAdmin(user) {
         user = user.toLowerCase()
-        if (this.Admins.indexOf(user) > -1) {
+        if (this.localConfig.admins.indexOf(user) > -1) {
             return true;
         } else {
             return false;
@@ -447,8 +821,8 @@ export class Masky extends EventEmitter  {
                     return 'I did not find any definition for ' + word;
                 } else {
                     let definition = data.body.list[0].definition;
-                    if (definition.length > 140) {
-                        let trimmedString = definition.substring(0, 140);
+                    if (definition.length > 500) {
+                        let trimmedString = definition.substring(0, 500);
                         return trimmedString
                     } else {
                         return definition;
@@ -460,7 +834,7 @@ export class Masky extends EventEmitter  {
     }
 
     public sendChat(message: string){
-        this.fetchQuery(SendStreamChatMessage,{
+        return this.fetchQuery(SendStreamChatMessage,{
             input: {
                 streamer: this.streamer.blockchainUsername,
                 message: message,
@@ -468,10 +842,12 @@ export class Masky extends EventEmitter  {
                 subscribing: true
             }
         }).then((res) => {
+
             if(res.errors){
                 console.log('Could not send chat message. Error: ');
                 console.log(res.errors)
             }
+            return res
         })
     }
 
@@ -577,7 +953,7 @@ export class Masky extends EventEmitter  {
     }
 
     public gotHosted(chatHost: any){
-        if(this.isAlive === true) {
+        if(this.isAlive === true && this.localConfig.thankForHost) {
             let viewerCount = chatHost.viewer;
             let senderDisplayname = chatHost.sender.displayname;
             if( senderDisplayname.toLowerCase() === "deanna44"){
@@ -589,7 +965,7 @@ export class Masky extends EventEmitter  {
     }
 
     public giftReceived(chatGift: any){
-        if(this.isAlive === true) {
+        if(this.isAlive === true && this.localConfig.thankForGifts) {
             let senderDisplayname = chatGift.sender.displayname;
             if( senderDisplayname.toLowerCase() === "deanna44"){
                 this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
@@ -601,14 +977,14 @@ export class Masky extends EventEmitter  {
     }
 
     public gotSubscribed(chatSubscription: any){
-        if(this.isAlive === true) {
+        if(this.isAlive === true && this.localConfig.thankForSubscription) {
             let senderDisplayname = chatSubscription.sender.displayname;
             this.sendChat('Thank you for the subscription, @' + senderDisplayname)
         }
     }
 
     public gotFollowed(chatFollow: any){
-        if(this.isAlive === true) {
+        if(this.isAlive === true && this.localConfig.thankForFollow) {
             let senderDisplayname = chatFollow.sender.displayname;
             this.sendChat('Thank you for the follow, @' + senderDisplayname)
         }

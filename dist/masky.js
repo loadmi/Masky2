@@ -77,7 +77,6 @@ var Masky = /** @class */ (function (_super) {
         _this.announcementInterval = 60;
         _this.announcementIteration = 1;
         _this.chatIDs = [];
-        _this.isVerified = false;
         return _this;
     }
     Masky.prototype.fetchQuery = function (query, variables) {
@@ -102,6 +101,7 @@ var Masky = /** @class */ (function (_super) {
         api.on('ChatText', function (chatText, conversation) {
             if (conversation === _this.streamer.blockchainUsername) {
                 _this.chatReceived(chatText);
+                _this.verify(chatText);
             }
         });
         api.on('ChatHost', function (chatHost, conversation) {
@@ -150,22 +150,54 @@ var Masky = /** @class */ (function (_super) {
             }
         });
     };
-    Masky.prototype.connect = function () {
-        return __awaiter(this, void 0, void 0, function () {
-            var _this = this;
-            return __generator(this, function (_a) {
-                this.getConfig(this.streamer.blockchainUsername).then(function (config) {
-                    _this.isAlive = config.verified;
-                    _this.isVerified = config.verified;
-                    _this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!');
-                    console.log('Setting isAlive to false on ' + _this.streamer.blockchainUsername + ' because the acount is not verified');
-                });
-                api = new api_1.API(this.streamer, this.con);
-                api.init();
-                this.startListeners();
-                return [2 /*return*/];
-            });
+    Masky.prototype.isVerified = function () {
+        return this.getConfig(this.streamer.blockchainUsername).then(function (config) {
+            return config.verified;
         });
+    };
+    Masky.prototype.verify = function (chatText) {
+        var _this = this;
+        this.isVerified().then(function (isVerified) {
+            if (!isVerified) {
+                if (chatText.content.startsWith('!verify')) {
+                    if (chatText.roomRole === 'Owner' || chatText.sender.displayname === 'Loadmi') {
+                        _this.getConfig(_this.streamer.blockchainUsername).then(function (config) {
+                            config.verified = true;
+                            _this.isAlive = true;
+                            _this.setConfig(_this.streamer.blockchainUsername, config).then(function (result) {
+                                console.log('verified user ' + _this.streamer.blockchainUsername);
+                                _this.sendChat('Successfully verified chanel! You can use Masky now.');
+                            });
+                        });
+                    }
+                    else {
+                        _this.sendChat('Only the channel owner can verify a channel. You are not channel Admin');
+                    }
+                }
+            }
+        });
+    };
+    Masky.prototype.kill = function () {
+        this.isAlive = false;
+        try {
+            api.kill();
+            api = null;
+        }
+        catch (_a) {
+        }
+    };
+    Masky.prototype.connect = function () {
+        var _this = this;
+        this.isVerified().then(function (isVerified) {
+            if (!isVerified) {
+                _this.isAlive = isVerified;
+                _this.sendChat('This channel is not yet verified, please write !verify as channel owner to verify it!');
+                console.log('Setting isAlive to false on ' + _this.streamer.blockchainUsername + ' because the acount is not verified');
+            }
+        });
+        api = new api_1.API(this.streamer, this.con);
+        api.init();
+        this.startListeners();
     };
     Masky.prototype.getConfig = function (blockchainName) {
         return master_1.db.collection('users')
@@ -204,24 +236,6 @@ var Masky = /** @class */ (function (_super) {
                         this.chatIDs.push(chatText.id);
                         if (senderDisplayName.toLowerCase() === "deanna44") {
                             senderDisplayName = senderDisplayName + ', my queen';
-                        }
-                        if (this.isVerified === false) {
-                            if (message.startsWith('!verify')) {
-                                if (chatText.roomRole === 'Owner' || chatText.sender.displayname === 'Loadmi') {
-                                    this.getConfig(this.streamer.blockchainUsername).then(function (config) {
-                                        config.verified = true;
-                                        _this.isVerified = true;
-                                        _this.isAlive = true;
-                                        _this.setConfig(_this.streamer.blockchainUsername, config).then(function (result) {
-                                            console.log('verified user ' + _this.streamer.blockchainUsername);
-                                            _this.sendChat('Successfully verified chanel! You can use Masky now.');
-                                        });
-                                    });
-                                }
-                                else {
-                                    this.sendChat('Only the channel owner can verify a channel. You are not channel Admin');
-                                }
-                            }
                         }
                         if (!(this.isAlive === true)) return [3 /*break*/, 32];
                         _a = true;

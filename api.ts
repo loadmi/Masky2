@@ -3,7 +3,7 @@ import {streamer} from "./types";
 import {connection} from "websocket";
 
 export class API extends EventEmitter {
-
+    public listener
     constructor(public streamer: streamer, public con:connection) {
         super()
     }
@@ -11,6 +11,9 @@ export class API extends EventEmitter {
 
     public async init() {
         this.subscribe()
+    }
+    public kill(){
+      //this.listener.removeAllListeners()
     }
 
     public subscribe(){
@@ -28,8 +31,8 @@ export class API extends EventEmitter {
             }
         }))
         console.log('connected user ' + this.streamer.blockchainUsername)
-    this.con.on('message', (message: any)=>{
-        console.log(message)
+    this.listener = this.con.on('message', (message: any)=>{
+
                 if (message && message.type === "utf8") {
                 message = JSON.parse(message.utf8Data);
                 if (message.payload !== undefined && message.payload.data) {

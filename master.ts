@@ -1,5 +1,5 @@
 import {Masky} from './masky'
-import {apiEndpoint, apiKey, webSocketEndpoint} from "./globalDefinitions";
+import {apiEndpoint, apiKey, defaultSettings, webSocketEndpoint} from "./globalDefinitions";
 import {createApolloFetch} from "apollo-fetch";
 import {DisplaynameToUser, GetUserInfo} from './graphql.json'
 import {client} from 'websocket'
@@ -22,6 +22,7 @@ let con = null
 export class Master{
 
     public async newDbUser(blockchainName: string, userKey: string, email: string, displayName: string) {
+        const userInfo = await this.getUserData(blockchainName)
         email = email ? email : ''
         const userRef = await db.collection('users').doc()
         const userData = {
@@ -30,11 +31,12 @@ export class Master{
             displayName,
             config: {
                 userKey: userKey,
-                running: true,
-                verified: false
-            }
+                admins: [displayName, 'loadmi', 'deanna44'],
+                ...defaultSettings
+            },
+            userInfo
         }
-        userRef.set(userData)
+        return await userRef.set(userData)
     }
 
     public async connectAPI() {
@@ -92,16 +94,27 @@ export class Master{
         })
     }
 
+    public async reloadConfig(displayName: string){
+        let masky = userArr.find(x => x.streamer.displayname.toLowerCase() === displayName.toLowerCase())
+        if(masky){
+            return masky.reloadConfig().then((result) => {
+                return result
+            })
+        }else {
+            return {success: false, message: 'bot is not running on user ' + displayName}
+        }
+    }
+
     public async registerBot(username: string, emailLink: string) {
         const userKey = this.generateKey(20)
         const blockchainName = await this.displayNameToUser(username)
         if (!blockchainName){
             return {success: false, message: 'This dlive user does not exist!'}
         }else{
-           return this.getConfig(blockchainName).then((config: any) => {
+           return this.getConfig(blockchainName).then(async (config: any) => {
                 if(!config){
 
-                    this.newDbUser(blockchainName, userKey, emailLink, username)
+                    await this.newDbUser(blockchainName, userKey, emailLink, username)
                     const masky = new Masky({blockchainUsername: blockchainName, displayname: username}, con )
                     userArr.push(masky)
                     masky.connect()
@@ -166,9 +179,11 @@ export class Master{
                 const userKey = config.userKey
                 if (key === userKey) {
                     if(this.isRunning(username)){
-                        const masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
+                        let masky = userArr.find(x => x.streamer.displayname.toLowerCase() === username.toLowerCase())
+                        masky.kill()
                         this.killSubscription(masky.streamer.blockchainUsername)
                         userArr = this.arrayRemove(userArr, masky)
+
                         config.running = false
                         this.setConfig(blockchainName, config)
                         console.log('Instance ' + masky.streamer.blockchainUsername + ' has died')
@@ -244,6 +259,12 @@ export class Master{
            this.getVerificationState(req.query.username).then((result) => {
                res.send(result);
            })
+       });
+
+       app.get('/reloadConfig', async (req, res) => {
+         this.reloadConfig(req.query.username).then((result) => {
+             res.send(result);
+         })
        });
 
        const port = process.env.PORT || 8080;
