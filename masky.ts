@@ -1,4 +1,4 @@
-import {dbUserConfig, streamer, userSettings} from "./types";
+import {dbUserConfig, streamer, userGift, userSettings} from "./types";
 import {EventEmitter} from "events";
 import {API} from './api'
 import {apiEndpoint, apiKey, commandsList} from './globalDefinitions'
@@ -13,6 +13,7 @@ import {
     StreamChatBannedUsers,
     UnbanStreamChatUser,
     UnfollowUser,
+    StreamClip,
 } from './graphql.json'
 import {connection} from "websocket";
 import {db} from "./master";
@@ -30,16 +31,55 @@ export class Masky extends EventEmitter  {
     public isAlive: Boolean = true
     public giveawayRunning: Boolean = false
     public giveawayEntries: Array<String> = []
-    public announcementDuration: number = 15
-    public announcementInterval: number = 60
     public announcementIteration = 1
     public chatIDs: Array<string> = []
     public localConfig: userSettings = null
+    public userGifts: userGift[] = []
     constructor( public streamer: streamer, public con: connection) {
         super()
     }
 
+    private hasReceivedThanksIn(displayName: string, seconds: number){
+        const now = Date.now()
+        const entry = this.userGifts.find(obj => (obj.displayName === displayName))
+        if(!entry){
+            return false
+        } else if((now - entry.latestThanksReceived) < (1000 * seconds)){
+            console.log((now - entry.latestThanksReceived) / 1000)
+            return true
+        } else {
+            return false
+        }
+    }
 
+    private setLatestDonation(displayName: string){
+        const entry = this.userGifts.find(obj => (obj.displayName === displayName))
+        if(!entry){
+            this.userGifts.push({
+                displayName,
+                latestThanksReceived: Date.now()
+            })
+        } else {
+            entry.latestThanksReceived = Date.now()
+        }
+        console.log(this.userGifts)
+    }
+
+    public streamClip(username: string){
+
+        return this.fetchQuery(StreamClip, {
+            username: username,
+        }).then((res) => {
+            if (res.data.user.livestream !== null){
+                return res.data.user.livestream.currentClip.url;
+            }
+            else{
+                return "Streamer Offline. Clip cannot be created!";
+            }
+        }).catch(err => {
+            return err;
+        })
+    }
 
 
     public fetchQuery(query: string, variables?: Object){
@@ -142,7 +182,7 @@ export class Masky extends EventEmitter  {
                                         this.isAlive = true
                                         this.setConfig(this.streamer.blockchainUsername, config).then((result) => {
                                             console.log('verified user ' + this.streamer.blockchainUsername)
-                                            this.sendChat('Successfully verified chanel! You can use Masky now.')
+                                            this.sendChat('Successfully verified channel! You can use Masky now.')
                                         })
                                     })
                                 } else {
@@ -207,13 +247,15 @@ public kill(){
         this.setConfig(this.streamer.blockchainUsername, this.localConfig)
     }
 
+
+
     public async chatReceived(chatText: any) {
         const message: string = chatText.content;
         const senderBlockchainName: string = chatText.sender.username;
         let senderDisplayName: string = chatText.sender.displayname;
         const id: string = chatText.id;
         const role: string = chatText.role;
-        const argument = message.split(/ (.+)/)[1]
+        let argument = message.split(/ (.+)/)[1]
 
         this.chatIDs.push(chatText.id)
 
@@ -225,10 +267,6 @@ public kill(){
         if(this.isAlive === true) {
 
             switch (true) {
-                case message.startsWith('!config'):
-                    this.sendChat('config has been logged to console')
-                    console.log(this.localConfig)
-                    break;
                 case message.startsWith('!help'):
                     this.sendChat('Available commands can be found here: ' + commandsList);
                     break;
@@ -284,6 +322,9 @@ public kill(){
                 case message.startsWith('!lino'):
                     if(this.localConfig.lino.enabled){
                         if (argument) {
+                            if(argument.startsWith('@')){
+                                argument =  argument.substr(1);
+                            }
                             const blockchainName = await this.displayNameToUser(argument)
                             if (blockchainName) {
                                 this.getUserData(blockchainName).then((data) => {
@@ -300,6 +341,13 @@ public kill(){
                         this.sendChat('@' + senderDisplayName + ' This command is not enabled! If you want to use it please ask the streamer to enable it.')
                     }
 
+                    break;
+                case message.startsWith('!clip'):
+                    this.streamClip(this.streamer.blockchainUsername).then(res => {
+                        this.sendChat(res);
+                    }).catch(err =>{
+                        this.sendChat('Clip Broken!')
+                    })
                     break;
                 case message.startsWith('!showadmins'):
                     this.sendChat('@' + senderDisplayName + ' Current admins: ' + this.localConfig.admins.toString())
@@ -321,38 +369,75 @@ public kill(){
                     break;
                 case message.startsWith('!warn'):
                     if(chatText.roomRole === 'Moderator' || chatText.roomRole === 'Owner'){
+
                         this.warnUser(argument, 1, '')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' Only Moderators and room Owners can warn users!')
                     }
                     break;
+                case message.startsWith('!uptime'):
+                   this.getUserData(this.streamer.blockchainUsername).then((streamerData) => {
+                       if(streamerData.user.livestream){
+                           const date = new Date(null);
+                           date.setSeconds((Date.now() - +streamerData.user.livestream.createdAt) / 1000);
+                           const result = date.toISOString().substr(11, 8);
+                           const hours = result.substr(0,2)
+                           const minutes = result.substr(3,2)
+                           const seconds = result.substr(6,2)
+                           this.sendChat('Streamer @' + this.streamer.displayname + ' has been streaming for ' + hours + ' Hours, ' + minutes + ' Minutes and ' + seconds + ' seconds')
+
+                       }else{
+                           this.sendChat('Streamer @' + this.streamer.displayname + ' is offline!')
+                       }
+                      })
+                    break;
+                case message.startsWith('NEWNONADMINCOMMANDS'):
+                    break;
+                case message.startsWith('NEWNONADMINCOMMANDS'):
+                    break;
+                case message.startsWith('NEWNONADMINCOMMANDS'):
+                    break;
+                case message.startsWith('NEWNONADMINCOMMANDS'):
+                    break;
                 case message.startsWith('NEWNONADMINCOMMANDS'):
                     break;
                 case message.startsWith('!addadmin'):
+                    let addName = null
+                    if(argument.startsWith('@')){
+                        addName = argument.substr(1);
+                    } else {
+                        addName = argument
+                    }
                     if (this.isAdmin(senderDisplayName)) {
-                        if (this.localConfig.admins.indexOf(argument) > -1) {
-                            this.sendChat(argument + ' Is already an admin')
+                        if (this.localConfig.admins.indexOf(addName) > -1) {
+                            this.sendChat(addName + ' Is already an admin')
                         } else {
-                            this.localConfig.admins.push(argument)
+                            this.localConfig.admins.push(addName)
                             this.syncConfig()
-                            this.sendChat(argument + ' has been added to the admin list!')
+                            this.sendChat(addName + ' has been added to the admin list!')
                         }
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
                     }
                     break;
                 case message.startsWith('!removeadmin'):
+                    let removeName = null
+                    if(argument.startsWith('@')){
+                        removeName = argument.substr(1);
+                    } else {
+                        removeName = argument
+                    }
                     if (this.isAdmin(senderDisplayName)) {
-                        if (this.localConfig.admins.indexOf(argument) > -1) {
+                        if (this.localConfig.admins.indexOf(removeName) > -1) {
                             for (let i = this.localConfig.admins.length - 1; i >= 0; i--) {
-                                if (this.localConfig.admins[i] === argument) {
+                                if (this.localConfig.admins[i] === removeName) {
                                     this.localConfig.admins.splice(i, 1);
                                 }
                             }
                             this.syncConfig()
-                            this.sendChat(argument + ' has been removed from the admin list')
+                            this.sendChat(removeName + ' has been removed from the admin list')
                         } else {
-                            this.sendChat(argument + ' Is not an admin')
+                            this.sendChat(removeName + ' Is not an admin')
                         }
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
@@ -397,18 +482,25 @@ public kill(){
                     }
                     break;
                 case message.startsWith('!clear'):
-                    if (this.isAdmin(senderDisplayName)) {
-                        this.chatIDs.forEach((chatID) => {
-                            this.deleteChat(chatID)
-                        })
-                        this.chatIDs = []
-                    } else {
-                        this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
-                    }
+                    this.isMod().then((isMod) => {
+                        if(isMod){
+                            if (this.isAdmin(senderDisplayName)) {
+                                this.chatIDs.forEach((chatID) => {
+                                    this.deleteChat(chatID)
+                                })
+                                this.chatIDs = []
+                            } else {
+                                this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
+                            }
+                        }else{
+                            this.sendChat('To use this feature you need to make me moderator and try again.')
+                        }
+                    })
                     break;
                 case message.startsWith('!setinterval'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementInterval = +argument
+                        this.localConfig.announcement.interval = +argument
+                        this.syncConfig()
                         this.sendChat('I have set the announcement interval to every ' + argument + ' seconds')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
@@ -416,18 +508,27 @@ public kill(){
                     break;
                 case message.startsWith('!setduration'):
                     if (this.isAdmin(senderDisplayName)) {
-                        this.announcementDuration = +argument
+                        this.localConfig.announcement.duration = +argument
+                        this.syncConfig()
                         this.sendChat('I have set the announcement duration to ' + argument + ' times')
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
                     }
                     break;
                 case message.startsWith('!announce'):
+                    console.log('test')
                     if (this.isAdmin(senderDisplayName)) {
-                        this.doAnnouncement(argument)
+                        if(argument){
+                            this.doAnnouncement(argument)
+                            this.sendChat('@' + senderDisplayName + ' Announcement has started')
+                        } else {
+                            this.doAnnouncement(this.localConfig.announcement.message)
+                            this.sendChat('@' + senderDisplayName + ' Announcement has started')
+                        }
                     } else {
                         this.sendChat('@' + senderDisplayName + ' I cannot do that as you are not an admin!')
                     }
+                    break;
                 case message.startsWith('!blocklanguage'):
                     if (this.isAdmin(senderDisplayName)) {
                         this.isMod().then((isMod) => {
@@ -463,7 +564,12 @@ public kill(){
                     }
                     break;
                 default:
-                    this.languageCheck(chatText)
+                    const customCommand = this.localConfig.customCommands.find(obj => (message.startsWith(obj.command)))
+                    if(customCommand){
+                        this.sendChat(customCommand.response)
+                    } else {
+                        this.languageCheck(chatText)
+                    }
                     break;
             }
             if(message.startsWith('@Masky_bot')){
@@ -503,7 +609,10 @@ public kill(){
     }
 
     private warnUser(displayName: string, severity: number, text: string){
-        const entry = this.localConfig.warningSystem.users.filter(obj => (obj.displayName === displayName))
+        if(displayName.startsWith('@')){
+            displayName = displayName.substr(1);
+        }
+        let entry = this.localConfig.warningSystem.users.filter(obj => (obj.displayName === displayName))
         if(entry.length === 0){
             this.localConfig.warningSystem.users.push({
                 displayName,
@@ -518,7 +627,21 @@ public kill(){
                     text
             })
         }
-        console.log(this.localConfig.warningSystem.users)
+        entry = this.localConfig.warningSystem.users.filter(obj => (obj.displayName === displayName))
+        let numberOfWarnings
+        let tier = 1
+        if(entry[0].warnings.length >  this.localConfig.warningSystem.warningsPerTier){
+            tier = Math.ceil(entry[0].warnings.length /  this.localConfig.warningSystem.warningsPerTier)
+            numberOfWarnings = entry[0].warnings.length %  this.localConfig.warningSystem.warningsPerTier
+            if(numberOfWarnings === 0) {
+                numberOfWarnings =  this.localConfig.warningSystem.warningsPerTier
+            }
+
+        } else {
+            numberOfWarnings = entry[0].warnings.length
+        }
+
+        this.sendChat('@' + displayName + ' You have been warned. You currently have ' + numberOfWarnings + ' out of ' + this.localConfig.warningSystem.warningsPerTier + ' warnings for tier ' + tier)
         this.processWarnings()
     }
 
@@ -528,18 +651,22 @@ public kill(){
             user.warnings.forEach((warning) => {
                 warnings += warning.severity
             })
-            const tier = warnings / this.localConfig.warningSystem.warningsPerTier
-            switch(tier){
-                case 1:
-                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier1.tierPenaltyType, this.localConfig.warningSystem.tiers.tier1.tierPenaltyDuration)
-                    break;
-                case 2:
-                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier2.tierPenaltyType, this.localConfig.warningSystem.tiers.tier2.tierPenaltyDuration)
-                    break;
-                case 3:
-                    this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier3.tierPenaltyType, this.localConfig.warningSystem.tiers.tier3.tierPenaltyDuration)
-                    break;
+            const tier = Math.ceil(warnings / this.localConfig.warningSystem.warningsPerTier)
+            const diffWarnings =  warnings %  this.localConfig.warningSystem.warningsPerTier
+            if(diffWarnings === 0){
+                switch(tier){
+                    case 1:
+                        this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier1.tierPenaltyType, this.localConfig.warningSystem.tiers.tier1.tierPenaltyDuration)
+                        break;
+                    case 2:
+                        this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier2.tierPenaltyType, this.localConfig.warningSystem.tiers.tier2.tierPenaltyDuration)
+                        break;
+                    case 3:
+                        this.punishUser(user.displayName, this.localConfig.warningSystem.tiers.tier3.tierPenaltyType, this.localConfig.warningSystem.tiers.tier3.tierPenaltyDuration)
+                        break;
+                }
             }
+
         })
     }
 
@@ -547,7 +674,6 @@ public kill(){
         console.log('punishing @' + displayName)
         console.log(type)
         if(type === 'temp_mute'){
-            console.log('sendchat')
             this.sendChat('temp_mute @' + displayName)
         } else if(type === 'mute'){
             this.displayNameToUser(displayName).then((blockchainName) => {
@@ -688,7 +814,8 @@ public kill(){
                 if(item.includes('english')){
                     if(this.localConfig.languageEnforcement.filterLanguages.english){
                         this.deleteChat(chatText.id).then((result) => {
-                            this.sendChat('@' + chatText.sender.displayname +' English is not allowed in this chanel!')
+                            this.sendChat('@' + chatText.sender.displayname +' English is not allowed in this channel!')
+                            this.warnUser(chatText.sender.displayname, 1, '')
                         })
                     }
                 }
@@ -696,9 +823,8 @@ public kill(){
                 if(item.includes('turkish')){
                     if(this.localConfig.languageEnforcement.filterLanguages.turkish){
                         this.deleteChat(chatText.id).then((result) => {
-                            console.log(result)
-                            console.log(chatText)
-                            this.sendChat('@' + chatText.sender.displayname +' Turkish is not allowed in this chanel!')
+                            this.sendChat('@' + chatText.sender.displayname +' Turkish is not allowed in this channel!')
+                            this.warnUser(chatText.sender.displayname, 1, '')
                         })
                 }
             }
@@ -706,7 +832,8 @@ public kill(){
             if(item.includes('german')){
                 if(this.localConfig.languageEnforcement.filterLanguages.german){
                     this.deleteChat(chatText.id).then((result) => {
-                        this.sendChat('@' + chatText.sender.displayname +' German is not allowed in this chanel!')
+                        this.sendChat('@' + chatText.sender.displayname +' German is not allowed in this channel!')
+                        this.warnUser(chatText.sender.displayname, 1, '')
                     })
                 }
             }
@@ -757,22 +884,19 @@ public kill(){
                 this.sendChat(message)
             }
             this.announcementIteration++;
-            if ( this.announcementIteration <= this.announcementDuration) {
+            if ( this.announcementIteration <= this.localConfig.announcement.duration) {
                 this.doAnnouncement(message);
             } else {
                 this.announcementIteration = 1
+                this.sendChat('The announcement has ended!')
             }
-        }, this.announcementInterval * 1000)
+        }, this.localConfig.announcement.interval * 1000)
     }
 
 
     public isAdmin(user) {
         user = user.toLowerCase()
-        if (this.localConfig.admins.indexOf(user) > -1) {
-            return true;
-        } else {
-            return false;
-        }
+        return this.localConfig.admins.indexOf(user) > -1;
     }
 
     public checkGuess(guess: number){
@@ -953,41 +1077,106 @@ public kill(){
     }
 
     public gotHosted(chatHost: any){
-        if(this.isAlive === true && this.localConfig.thankForHost) {
+        if(this.isAlive === true && this.localConfig.thankForHost.enabled) {
             let viewerCount = chatHost.viewer;
             let senderDisplayname = chatHost.sender.displayname;
+            if(this.localConfig.thankForHost.customMessage === ''){
             if( senderDisplayname.toLowerCase() === "deanna44"){
                 this.sendChat('Feel honored, the queen has hosted you!')
             } else {
                 this.sendChat('Thank you for the host with ' + viewerCount + ' viewers,  @' + senderDisplayname)
             }
+        } else {
+            let message = this.localConfig.thankForGifts.customMessage
+            message = message.replace('[sender]', senderDisplayname)
+            this.sendChat(message)
+        }
         }
     }
 
     public giftReceived(chatGift: any){
-        if(this.isAlive === true && this.localConfig.thankForGifts) {
-            let senderDisplayname = chatGift.sender.displayname;
-            if( senderDisplayname.toLowerCase() === "deanna44"){
-                this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
-            } else {
-                this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname)
-            }
+        let senderDisplayname = chatGift.sender.displayname;
+        if(this.isAlive === true && this.localConfig.thankForGifts.enabled) {
+           switch (chatGift.gift) {
 
+               case 'LEMON':
+                   if(!this.hasReceivedThanksIn(senderDisplayname, 60)) {
+                       if (this.localConfig.thankForGifts.customMessage === '') {
+                           if (senderDisplayname.toLowerCase() === "deanna44") {
+                               this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
+                           } else {
+                               this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname)
+                           }
+                           this.setLatestDonation(senderDisplayname)
+                       } else {
+                           let message = this.localConfig.thankForGifts.customMessage
+                           message = message.replace('[sender]', senderDisplayname)
+                           message = message.replace('[giftname]', chatGift.gift)
+                           this.sendChat(message)
+                       }
+                   }
+                   break;
+               case 'ICE_CREAM':
+                   if(!this.hasReceivedThanksIn(senderDisplayname, 30)){
+                       if (this.localConfig.thankForGifts.customMessage === '') {
+                       if( senderDisplayname.toLowerCase() === "deanna44"){
+                           this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
+                       } else {
+                           this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname)
+                       }
+                       this.setLatestDonation(senderDisplayname)
+                   } else {
+                           let message = this.localConfig.thankForGifts.customMessage
+                           message = message.replace('[sender]', senderDisplayname)
+                           message = message.replace('[giftname]', chatGift.gift)
+                           this.sendChat(message)
+                       }
+           }
+                   break;
+               default:
+                   if (this.localConfig.thankForGifts.customMessage === '') {
+                   if( senderDisplayname.toLowerCase() === "deanna44"){
+                       this.sendChat('Thank you for the ' + chatGift.gift + '(s), My queen @' + senderDisplayname)
+                   } else {
+                       this.sendChat('Thank you for the ' + chatGift.gift + '(s), @' + senderDisplayname)
+                   }
+                   this.setLatestDonation(senderDisplayname)
+                   } else {
+                       let message = this.localConfig.thankForGifts.customMessage
+                       message = message.replace('[sender]', senderDisplayname)
+                       message = message.replace('[giftname]', chatGift.gift)
+                       this.sendChat(message)
+                   }
+           }
         }
+
     }
 
     public gotSubscribed(chatSubscription: any){
-        if(this.isAlive === true && this.localConfig.thankForSubscription) {
-            let senderDisplayname = chatSubscription.sender.displayname;
+        let senderDisplayname = chatSubscription.sender.displayname;
+        if(this.isAlive === true && this.localConfig.thankForSubscription.enabled) {
+            if (this.localConfig.thankForSubscription.customMessage === '') {
             this.sendChat('Thank you for the subscription, @' + senderDisplayname)
+        } else {
+            let message = this.localConfig.thankForSubscription.customMessage
+            message = message.replace('[sender]', senderDisplayname)
+            this.sendChat(message)
+        }
         }
     }
 
     public gotFollowed(chatFollow: any){
-        if(this.isAlive === true && this.localConfig.thankForFollow) {
-            let senderDisplayname = chatFollow.sender.displayname;
+        let senderDisplayname = chatFollow.sender.displayname;
+        if(this.isAlive === true && this.localConfig.thankForFollow.enabled) {
+            if (this.localConfig.thankForFollow.customMessage === '') {
             this.sendChat('Thank you for the follow, @' + senderDisplayname)
+        } else {
+            let message = this.localConfig.thankForFollow.customMessage
+            message = message.replace('[sender]', senderDisplayname)
+            this.sendChat(message)
         }
+        }
+
     }
 
     public messageDeleted(chatDelete: any){

@@ -1,0 +1,162 @@
+[debug] [2019-12-21T22:35:20.368Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:35:20.370Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2019-12-21T22:35:20.370Z] CLI Version:   7.11.0
+[debug] [2019-12-21T22:35:20.370Z] Platform:      win32
+[debug] [2019-12-21T22:35:20.370Z] Node Version:  v10.16.3
+[debug] [2019-12-21T22:35:20.378Z] Time:          Sat Dec 21 2019 23:35:20 GMT+0100 (GMT+01:00)
+[debug] [2019-12-21T22:35:20.378Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:35:20.378Z] 
+[debug] [2019-12-21T22:35:20.386Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2019-12-21T22:35:20.387Z] > authorizing via signed-in user
+[debug] [2019-12-21T22:35:20.387Z] [iam] checking project maskybot for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2019-12-21T22:35:20.389Z] >>> HTTP REQUEST POST https://cloudresourcemanager.googleapis.com/v1/projects/maskybot:testIamPermissions  
+
+[debug] [2019-12-21T22:35:21.604Z] <<< HTTP RESPONSE 200
+[debug] [2019-12-21T22:35:21.605Z] >>> HTTP REQUEST GET https://firebase.googleapis.com/v1beta1/projects/maskybot  
+ 
+[debug] [2019-12-21T22:35:21.930Z] <<< HTTP RESPONSE 200
+[info] 
+[info] === Deploying to 'maskybot'...
+[info] 
+[info] i  deploying hosting
+[debug] [2019-12-21T22:35:21.945Z] >>> HTTP REQUEST POST https://firebasehosting.googleapis.com/v1beta1/sites/maskybot/versions  
+
+[debug] [2019-12-21T22:36:09.329Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:36:09.331Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2019-12-21T22:36:09.332Z] CLI Version:   7.11.0
+[debug] [2019-12-21T22:36:09.332Z] Platform:      win32
+[debug] [2019-12-21T22:36:09.332Z] Node Version:  v10.16.3
+[debug] [2019-12-21T22:36:09.333Z] Time:          Sat Dec 21 2019 23:36:09 GMT+0100 (GMT+01:00)
+[debug] [2019-12-21T22:36:09.333Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:36:09.333Z] 
+[debug] [2019-12-21T22:36:09.340Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2019-12-21T22:36:09.341Z] > authorizing via signed-in user
+[debug] [2019-12-21T22:36:09.341Z] [iam] checking project maskybot for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2019-12-21T22:36:09.342Z] >>> HTTP REQUEST POST https://cloudresourcemanager.googleapis.com/v1/projects/maskybot:testIamPermissions  
+
+[debug] [2019-12-21T22:36:10.576Z] <<< HTTP RESPONSE 200
+[debug] [2019-12-21T22:36:10.578Z] >>> HTTP REQUEST GET https://firebase.googleapis.com/v1beta1/projects/maskybot  
+ 
+[debug] [2019-12-21T22:36:10.911Z] <<< HTTP RESPONSE 200
+[info] 
+[info] === Deploying to 'maskybot'...
+[info] 
+[info] i  deploying hosting
+[debug] [2019-12-21T22:36:10.922Z] >>> HTTP REQUEST POST https://firebasehosting.googleapis.com/v1beta1/sites/maskybot/versions  
+
+[debug] [2019-12-21T22:36:23.699Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:36:23.701Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js init
+[debug] [2019-12-21T22:36:23.701Z] CLI Version:   7.11.0
+[debug] [2019-12-21T22:36:23.701Z] Platform:      win32
+[debug] [2019-12-21T22:36:23.701Z] Node Version:  v10.16.3
+[debug] [2019-12-21T22:36:23.702Z] Time:          Sat Dec 21 2019 23:36:23 GMT+0100 (GMT+01:00)
+[debug] [2019-12-21T22:36:23.702Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:36:23.702Z] 
+[debug] [2019-12-21T22:36:23.710Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2019-12-21T22:36:23.710Z] > authorizing via signed-in user
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  C:\Dlive\The new Masky\Bot\Masky2
+
+Before we get started, keep in mind:
+
+  * You are currently outside your home directory
+  * You are initializing in an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] but for now we'll just set up a default project.
+[info] 
+[info] i  .firebaserc already has a default project, using maskybotcore.
+[debug] [2019-12-21T22:36:27.886Z] >>> HTTP REQUEST GET https://firebase.googleapis.com/v1beta1/projects/maskybotcore  
+ 
+[debug] [2019-12-21T22:36:28.392Z] <<< HTTP RESPONSE 403
+[debug] [2019-12-21T22:36:28.392Z] <<< HTTP RESPONSE BODY
+[debug] [2019-12-21T22:36:28.393Z] HTTP Error: 403, The caller does not have permission
+[debug] [2019-12-21T22:36:30.409Z] FirebaseError: HTTP Error: 403, The caller does not have permission
+    at module.exports (C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\responseToError.js:38:12)
+    at Request._callback (C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\api.js:39:35)
+    at Request.self.callback (C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\request\request.js:185:22)
+    at Request.emit (events.js:198:13)
+    at Request.EventEmitter.emit (domain.js:448:20)
+    at Request.<anonymous> (C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\request\request.js:1161:10)
+    at Request.emit (events.js:198:13)
+    at Request.EventEmitter.emit (domain.js:448:20)
+    at IncomingMessage.<anonymous> (C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\request\request.js:1083:12)
+    at Object.onceWrapper (events.js:286:20)
+    at IncomingMessage.emit (events.js:203:15)
+    at IncomingMessage.EventEmitter.emit (domain.js:448:20)
+    at endReadableNT (_stream_readable.js:1145:12)
+    at process._tickCallback (internal/process/next_tick.js:63:19)
+[error] 
+[error] Error: Failed to get Firebase project maskybotcore. Please make sure the project exists and your account has permission to access it.
+[debug] [2019-12-21T22:37:00.066Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:37:00.068Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting:maskybotcore
+[debug] [2019-12-21T22:37:00.069Z] CLI Version:   7.11.0
+[debug] [2019-12-21T22:37:00.069Z] Platform:      win32
+[debug] [2019-12-21T22:37:00.069Z] Node Version:  v10.16.3
+[debug] [2019-12-21T22:37:00.070Z] Time:          Sat Dec 21 2019 23:37:00 GMT+0100 (GMT+01:00)
+[debug] [2019-12-21T22:37:00.070Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:37:00.070Z] 
+[debug] [2019-12-21T22:37:00.078Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2019-12-21T22:37:00.079Z] > authorizing via signed-in user
+[debug] [2019-12-21T22:37:00.079Z] [iam] checking project maskybot for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2019-12-21T22:37:00.081Z] >>> HTTP REQUEST POST https://cloudresourcemanager.googleapis.com/v1/projects/maskybot:testIamPermissions  
+
+[debug] [2019-12-21T22:37:01.099Z] <<< HTTP RESPONSE 200
+[debug] [2019-12-21T22:37:01.100Z] >>> HTTP REQUEST GET https://firebase.googleapis.com/v1beta1/projects/maskybot  
+ 
+[debug] [2019-12-21T22:37:01.467Z] <<< HTTP RESPONSE 200
+[info] 
+[info] === Deploying to 'maskybot'...
+[info] 
+[info] i  deploying hosting
+[info] 
+[info] +  Deploy complete!
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/maskybot/overview
+[debug] [2019-12-21T22:37:03.498Z] TypeError: Cannot read property 'deploys' of undefined
+    at C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\index.js:84:36
+    at process._tickCallback (internal/process/next_tick.js:68:7)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2019-12-21T22:37:17.943Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:37:17.945Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting:maskybotcore
+[debug] [2019-12-21T22:37:17.946Z] CLI Version:   7.11.0
+[debug] [2019-12-21T22:37:17.946Z] Platform:      win32
+[debug] [2019-12-21T22:37:17.946Z] Node Version:  v10.16.3
+[debug] [2019-12-21T22:37:17.946Z] Time:          Sat Dec 21 2019 23:37:17 GMT+0100 (GMT+01:00)
+[debug] [2019-12-21T22:37:17.946Z] ----------------------------------------------------------------------
+[debug] [2019-12-21T22:37:17.946Z] 
+[debug] [2019-12-21T22:37:17.955Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2019-12-21T22:37:17.956Z] > authorizing via signed-in user
+[debug] [2019-12-21T22:37:17.956Z] [iam] checking project maskybot for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2019-12-21T22:37:17.957Z] >>> HTTP REQUEST POST https://cloudresourcemanager.googleapis.com/v1/projects/maskybot:testIamPermissions  
+
+[debug] [2019-12-21T22:37:19.052Z] <<< HTTP RESPONSE 200
+[debug] [2019-12-21T22:37:19.053Z] >>> HTTP REQUEST GET https://firebase.googleapis.com/v1beta1/projects/maskybot  
+ 
+[debug] [2019-12-21T22:37:19.383Z] <<< HTTP RESPONSE 200
+[info] 
+[info] === Deploying to 'maskybot'...
+[info] 
+[info] i  deploying hosting
+[info] 
+[info] +  Deploy complete!
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/maskybot/overview
+[debug] [2019-12-21T22:37:21.410Z] TypeError: Cannot read property 'deploys' of undefined
+    at C:\Users\Loris Nico\AppData\Roaming\npm\node_modules\firebase-tools\lib\deploy\index.js:84:36
+    at process._tickCallback (internal/process/next_tick.js:68:7)
+[error] 
+[error] Error: An unexpected error has occurred.

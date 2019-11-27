@@ -102,6 +102,13 @@ export type userSettings = {
     running: boolean,
     admins?: Array<string>,
     userKey?: string,
+    customCommands: {
+        command: string,
+        response: string
+    }[]
 }
 
-
+export type userGift = {
+    displayName: string,
+    latestThanksReceived: number
+}

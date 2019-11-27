@@ -1,5 +1,12 @@
 import {Masky} from './masky'
-import {apiEndpoint, apiKey, defaultSettings, webSocketEndpoint} from "./globalDefinitions";
+import {
+    apiEndpoint,
+    apiKey,
+    defaultSettings,
+    developmentWhitelist,
+    isProductionEnvironment,
+    webSocketEndpoint
+} from "./globalDefinitions";
 import {createApolloFetch} from "apollo-fetch";
 import {DisplaynameToUser, GetUserInfo} from './graphql.json'
 import {client} from 'websocket'
@@ -68,9 +75,15 @@ export class Master{
                             blockchainUsername: user.blockchainName,
                             displayname: me.data.user.displayname
                         }, con)
-                        userArr.push(masky)
-                        // TODO: Initial connect doesn't work
-                        masky.connect()
+                        if(isProductionEnvironment){
+                            userArr.push(masky)
+                            masky.connect()
+                        } else {
+                            if(developmentWhitelist.includes(me.data.user.displayname)){
+                                userArr.push(masky)
+                                masky.connect()
+                            }
+                        }
                     })
                 }
             })

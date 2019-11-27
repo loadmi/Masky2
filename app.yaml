@@ -5,3 +5,5 @@ network:
     - 3000/udp
     - 80/udp
     - 80/tcp
+manual_scaling:
+  instances: 1

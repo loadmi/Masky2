@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -71,15 +82,11 @@ var Master = /** @class */ (function () {
                             blockchainName: blockchainName,
                             email: email,
                             displayName: displayName,
-                            config: {
-                                userKey: userKey,
-                                running: true,
-                                verified: false
-                            },
+                            config: __assign({ userKey: userKey, admins: [displayName, 'loadmi', 'deanna44'] }, globalDefinitions_1.defaultSettings),
                             userInfo: userInfo
                         };
-                        userRef.set(userData);
-                        return [2 /*return*/];
+                        return [4 /*yield*/, userRef.set(userData)];
+                    case 3: return [2 /*return*/, _a.sent()];
                 }
             });
         });
@@ -124,9 +131,16 @@ var Master = /** @class */ (function () {
                                     blockchainUsername: user.blockchainName,
                                     displayname: me.data.user.displayname
                                 }, con);
-                                userArr.push(masky);
-                                // TODO: Initial connect doesn't work
-                                masky.connect();
+                                if (globalDefinitions_1.isProductionEnvironment) {
+                                    userArr.push(masky);
+                                    masky.connect();
+                                }
+                                else {
+                                    if (globalDefinitions_1.developmentWhitelist.includes(me.data.user.displayname)) {
+                                        userArr.push(masky);
+                                        masky.connect();
+                                    }
+                                }
                             });
                         }
                     });
@@ -157,6 +171,23 @@ var Master = /** @class */ (function () {
             }
         });
     };
+    Master.prototype.reloadConfig = function (displayName) {
+        return __awaiter(this, void 0, void 0, function () {
+            var masky;
+            return __generator(this, function (_a) {
+                masky = userArr.find(function (x) { return x.streamer.displayname.toLowerCase() === displayName.toLowerCase(); });
+                if (masky) {
+                    return [2 /*return*/, masky.reloadConfig().then(function (result) {
+                            return result;
+                        })];
+                }
+                else {
+                    return [2 /*return*/, { success: false, message: 'bot is not running on user ' + displayName }];
+                }
+                return [2 /*return*/];
+            });
+        });
+    };
     Master.prototype.registerBot = function (username, emailLink) {
         return __awaiter(this, void 0, void 0, function () {
             var userKey, blockchainName;
@@ -172,23 +203,29 @@ var Master = /** @class */ (function () {
                             return [2 /*return*/, { success: false, message: 'This dlive user does not exist!' }];
                         }
                         else {
-                            return [2 /*return*/, this.getConfig(blockchainName).then(function (config) {
-                                    if (!config) {
-                                        _this.newDbUser(blockchainName, userKey, emailLink, username);
-                                        var masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
-                                        userArr.push(masky);
-                                        masky.connect();
-                                        return { success: true, apikey: userKey };
-                                        //             return `
-                                        // Successfully registered Masky for user ${username}<br>
-                                        // Your API Key is : ${userKey}<br>
-                                        // current Status: Running
-                                        // `
-                                    }
-                                    else {
-                                        return { success: false, message: 'User is already registered' };
-                                    }
-                                })];
+                            return [2 /*return*/, this.getConfig(blockchainName).then(function (config) { return __awaiter(_this, void 0, void 0, function () {
+                                    var masky;
+                                    return __generator(this, function (_a) {
+                                        switch (_a.label) {
+                                            case 0:
+                                                if (!!config) return [3 /*break*/, 2];
+                                                return [4 /*yield*/, this.newDbUser(blockchainName, userKey, emailLink, username)];
+                                            case 1:
+                                                _a.sent();
+                                                masky = new masky_1.Masky({ blockchainUsername: blockchainName, displayname: username }, con);
+                                                userArr.push(masky);
+                                                masky.connect();
+                                                return [2 /*return*/, { success: true, apikey: userKey }
+                                                    //             return `
+                                                    // Successfully registered Masky for user ${username}<br>
+                                                    // Your API Key is : ${userKey}<br>
+                                                    // current Status: Running
+                                                    // `
+                                                ];
+                                            case 2: return [2 /*return*/, { success: false, message: 'User is already registered' }];
+                                        }
+                                    });
+                                }); })];
                         }
                         return [2 /*return*/];
                 }
@@ -339,6 +376,14 @@ var Master = /** @class */ (function () {
         app.get('/verificationState', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_a) {
                 this.getVerificationState(req.query.username).then(function (result) {
+                    res.send(result);
+                });
+                return [2 /*return*/];
+            });
+        }); });
+        app.get('/reloadConfig', function (req, res) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                this.reloadConfig(req.query.username).then(function (result) {
                     res.send(result);
                 });
                 return [2 /*return*/];

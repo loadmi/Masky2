@@ -28,5 +28,6 @@
   "DisplaynameToUser": "query userByDisplayName($displayname: String!){\n  userByDisplayName(displayname: $displayname){\n    username\n  }\n}",
   "FollowUser": "mutation follow($streamer:String!){follow(streamer:$streamer){err{code message}}}",
   "UnfollowUser": "mutation unfollow($streamer:String!){follow(streamer:$streamer){err{code message}}}",
-  "DeleteChat": "mutation chatDelete($streamer:String!,$id:String!){chatDelete(streamer:$streamer,id:$id){err{code}}}"
+  "DeleteChat": "mutation chatDelete($streamer:String!,$id:String!){chatDelete(streamer:$streamer,id:$id){err{code}}}",
+  "StreamClip":"query ClipPublishStreamer($username: String!){user(username:$username){livestream{currentClip{url imgUrl}}}}"
 }
