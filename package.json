@@ -29,7 +29,7 @@
     "firebase-admin": "^8.6.1",
     "graphql": "^14.5.8",
     "languagedetect": "^2.0.0",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.7",
     "subscriptions-transport-ws": "^0.9.16",
     "ts-node-dev": "^1.0.0-pre.43",
     "typescript": "^3.6.4",
