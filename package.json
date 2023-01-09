@@ -26,7 +26,7 @@
     "data-store": "^4.0.3",
     "esm": "^3.2.25",
     "express": "^4.17.1",
-    "firebase-admin": "^8.6.1",
+    "firebase-admin": "^11.4.1",
     "graphql": "^14.5.8",
     "languagedetect": "^2.0.0",
     "node-fetch": "^2.6.0",
